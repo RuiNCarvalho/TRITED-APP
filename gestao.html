@@ -1,0 +1,2384 @@
+<!-- TRITED - Gestão -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ========== COLOR SYSTEM - TRITED (orange + blue) ========== */
+  :root[data-theme="light"]{
+    --bg:#f0ece2;
+    --bg-alt:#e8e3d4;
+    --bg-grad:radial-gradient(ellipse at top, #f5e8d6 0%, #f0ece2 55%);
+    --card:#faf6ec;
+    --card-hover:#f5f0e2;
+    --ink:#2a2418;
+    --ink-soft:#5a5142;
+    --muted:#8c8473;
+    --line:#e0d8c4;
+    --line-soft:#ebe5d5;
+    --accent:#ea6a1f;
+    --accent-hover:#d15a15;
+    --accent-soft:#fbe6d2;
+    --accent-grad:linear-gradient(135deg,#f47a2a 0%,#e8551a 100%);
+    --blue:#1e5788;
+    --blue-hover:#164368;
+    --blue-soft:#dbe5f0;
+    --blue-grad:linear-gradient(135deg,#2a6ba3 0%,#143f64 100%);
+    --ok:#3d7a4a; --ok-soft:#dfecd9;
+    --warn:#9c7515; --warn-soft:#f3e7c4;
+    --danger:#a82a30; --danger-soft:#f3dcd8;
+    --partial:#7c3aed; --partial-soft:#e8dcf3;
+    --shadow-sm:0 1px 2px rgba(74,58,30,.05);
+    --shadow:0 1px 3px rgba(74,58,30,.06), 0 4px 16px rgba(74,58,30,.06);
+    --shadow-lg:0 4px 12px rgba(74,58,30,.08), 0 16px 40px rgba(74,58,30,.1);
+    --shadow-accent:0 4px 14px rgba(234,106,31,.22);
+    --shadow-blue:0 4px 14px rgba(30,87,136,.22);
+  }
+  :root[data-theme="dark"]{
+    --bg:#080f1e;
+    --bg-alt:#0d1828;
+    --bg-grad:radial-gradient(ellipse at top, #1a1410 0%, #080f1e 60%);
+    --card:#111f36;
+    --card-hover:#152741;
+    --ink:#eaf0f9;
+    --ink-soft:#b4c2d4;
+    --muted:#6b7e98;
+    --line:#22344f;
+    --line-soft:#172741;
+    --accent:#ff8c4d;
+    --accent-hover:#ffa066;
+    --accent-soft:#2d1a0e;
+    --accent-grad:linear-gradient(135deg,#ff8c4d 0%,#e8551a 100%);
+    --blue:#5fa3d6;
+    --blue-hover:#7fb8e0;
+    --blue-soft:#142a44;
+    --blue-grad:linear-gradient(135deg,#5fa3d6 0%,#2a6ba3 100%);
+    --ok:#5cc283; --ok-soft:#0f2818;
+    --warn:#e0b020; --warn-soft:#2a2208;
+    --danger:#e84855; --danger-soft:#2e1014;
+    --partial:#a78bfa; --partial-soft:#1f1638;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 2px 4px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    --shadow-lg:0 4px 12px rgba(0,0,0,.5), 0 20px 60px rgba(0,0,0,.4);
+    --shadow-accent:0 4px 18px rgba(255,140,77,.3);
+    --shadow-blue:0 4px 18px rgba(95,163,214,.3);
+  }
+
+  html,body{background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;transition:background .2s, color .2s;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4,.serif{font-family:'Fraunces',Georgia,serif;letter-spacing:-0.015em;font-weight:600;}
+
+  .brand{display:flex;align-items:center;}
+  .brand-img{height:54px;width:auto;display:block;}
+  :root[data-theme="dark"] .brand-img{filter:drop-shadow(0 0 12px rgba(95,163,214,.15));}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);transition:all .2s ease;}
+  .card:hover{box-shadow:var(--shadow-lg);}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;font-weight:600;font-size:13.5px;border:1px solid transparent;cursor:pointer;transition:all .15s ease;letter-spacing:0.01em;}
+  .btn-primary{background:var(--blue-grad);color:#fff;box-shadow:var(--shadow-blue);}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(30,87,136,.35);}
+  .btn-accent{background:var(--accent-grad);color:#fff;box-shadow:var(--shadow-accent);}
+  .btn-accent:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(234,106,31,.4);}
+  .btn-ghost{background:var(--card);color:var(--ink);border-color:var(--line);box-shadow:var(--shadow-sm);}
+  .btn-ghost:hover{background:var(--line-soft);border-color:var(--ink-soft);}
+  .btn-ok{background:linear-gradient(135deg,#2ba366 0%,#1f8a4c 100%);color:#fff;box-shadow:0 4px 14px rgba(31,138,76,.25);}
+  .btn-ok:hover{transform:translateY(-1px);}
+  .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger-soft);}
+  .btn-danger:hover{background:var(--danger-soft);border-color:var(--danger);}
+  .input, .select, textarea{width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);font:inherit;font-size:14px;color:var(--ink);outline:none;transition:all .15s;}
+  .input:focus, .select:focus, textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft);}
+  .input:disabled{opacity:.5;background:var(--line-soft);}
+  .label{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block;}
+  .badge{display:inline-block;padding:4px 11px;border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+  .badge-ok{background:var(--ok-soft);color:var(--ok);}
+  .badge-warn{background:var(--warn-soft);color:var(--warn);}
+  .badge-danger{background:var(--danger-soft);color:var(--danger);}
+  .badge-partial{background:var(--partial-soft);color:var(--partial);}
+  .badge-blue{background:var(--blue-soft);color:var(--blue);}
+  .badge-neutral{background:var(--line-soft);color:var(--ink-soft);}
+
+  .nav-tab{padding:11px 20px;border-radius:11px;font-weight:600;font-size:14px;cursor:pointer;color:var(--ink-soft);transition:all .2s ease;background:transparent;border:none;white-space:nowrap;flex-shrink:0;letter-spacing:0.01em;}
+  .nav-tab:hover{background:var(--line-soft);color:var(--ink);transform:translateY(-1px);}
+  .nav-tab.active{background:var(--blue-grad);color:#fff;box-shadow:var(--shadow-blue);}
+
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--line-soft);}
+  th:first-child{border-top-left-radius:14px;}
+  th:last-child{border-top-right-radius:14px;}
+  td{padding:15px 16px;border-bottom:1px solid var(--line-soft);font-size:14px;vertical-align:middle;color:var(--ink);}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable{cursor:pointer;transition:background .15s;}
+  tr.clickable:hover td{background:var(--card-hover);}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(5,15,30,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s ease;}
+  .modal{background:var(--card);border-radius:20px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.3);animation:slideUp .3s cubic-bezier(.16,1,.3,1);}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px) scale(.98);}to{opacity:1;transform:none;}}
+
+  .stat-num{font-family:'Fraunces',serif;font-size:42px;font-weight:600;line-height:1;color:var(--ink);letter-spacing:-0.02em;}
+  .stat-accent{background:var(--accent-grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .stat-ok{color:var(--ok);}
+  .stat-blue{background:var(--blue-grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .input:focus, .select:focus, textarea:focus{border-color:var(--blue);}
+  .input:disabled{opacity:.5;background:var(--line-soft);}
+
+  /* Horizontal scrollable tab bar */
+  .tab-bar{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:10px 4px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;scrollbar-width:none;}
+  .tab-bar::-webkit-scrollbar{display:none;}
+  .tab-bar.dragging{cursor:grabbing;}
+  .tab-bar-wrap{position:relative;border-top:1px solid var(--line);background:var(--card);}
+  .tab-bar-wrap::before,.tab-bar-wrap::after{content:'';position:absolute;top:0;bottom:0;width:30px;pointer-events:none;z-index:2;}
+  .tab-bar-wrap::before{left:0;background:linear-gradient(to right,var(--card),transparent);}
+  .tab-bar-wrap::after{right:0;background:linear-gradient(to left,var(--card),transparent);}
+
+  .theme-toggle{padding:10px 12px;border-radius:11px;background:var(--card);border:1px solid var(--line);cursor:pointer;color:var(--ink);font-size:18px;transition:all .15s;line-height:1;box-shadow:var(--shadow-sm);}
+  .theme-toggle:hover{background:var(--line-soft);transform:translateY(-1px);box-shadow:var(--shadow);}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--line-soft);border-radius:999px;font-size:12.5px;color:var(--ink);font-weight:500;}
+  .stat-blue{color:var(--blue);}
+
+  .empty{text-align:center;padding:54px 20px;color:var(--muted);}
+  .empty-icon{font-size:48px;margin-bottom:10px;opacity:.4;}
+  .obra-num{font-family:'Fraunces',serif;font-weight:700;background:var(--accent-grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .section-box{border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--bg-alt);position:relative;}
+
+  /* Progress bar for partial payments */
+  .progress{height:10px;background:var(--line-soft);border-radius:999px;overflow:hidden;border:1px solid var(--line);}
+  .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent) 0%,var(--blue) 100%);border-radius:999px;transition:width .4s ease;}
+
+  /* ITED sheet (PDF preview) - stays in light for print */
+  .ited-sheet{background:#fff;color:#000;font-family:Arial,sans-serif;font-size:11px;padding:30px;width:800px;}
+  .ited-sheet h1{font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-align:center;border:1.5px solid #000;padding:6px;margin-bottom:10px;color:#000;}
+  .ited-sheet .ited-row{display:flex;border:1px solid #000;border-bottom:none;}
+  .ited-sheet .ited-row:last-child{border-bottom:1px solid #000;}
+  .ited-sheet .ited-cell{padding:4px 6px;border-right:1px solid #000;flex:1;min-height:20px;}
+  .ited-sheet .ited-cell:last-child{border-right:none;}
+  .ited-sheet .ited-label{font-size:9px;font-weight:bold;text-transform:uppercase;color:#333;}
+  .ited-sheet .ited-val{font-size:11px;color:#000;}
+  .ited-sheet .ited-section{background:#e8e8e8;font-weight:bold;font-size:11px;padding:5px 6px;border:1px solid #000;border-bottom:none;text-transform:uppercase;color:#000;}
+  .ited-sheet table.ited-tab{width:100%;border-collapse:collapse;border:1px solid #000;}
+  .ited-sheet table.ited-tab th,.ited-sheet table.ited-tab td{border:1px solid #000;padding:4px 6px;font-size:10px;text-align:left;vertical-align:top;color:#000;}
+  .ited-sheet table.ited-tab th{background:#f0f0f0;font-size:9px;text-transform:uppercase;}
+  .ited-sheet .doc-list{border:1px solid #000;padding:8px;font-size:10px;color:#000;}
+  .ited-sheet .doc-list p{margin:3px 0;}
+  .ited-sheet .trited-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #ea6a1f;}
+  .ited-sheet .trited-header .brand-name{font-family:'Fraunces',serif;font-weight:800;font-size:22px;letter-spacing:3px;color:#ea6a1f;}
+  .ited-sheet .trited-header .brand-sub{font-size:9px;color:#1e5788;letter-spacing:2px;text-transform:uppercase;}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media(max-width:760px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+  .icon-btn{padding:7px 11px;border-radius:8px;cursor:pointer;color:var(--ink-soft);background:transparent;border:none;line-height:1;}
+  .icon-btn:hover{background:var(--line-soft);color:var(--ink);}
+
+  /* File drop zones */
+  .dropzone{border:2px dashed var(--line);border-radius:14px;padding:24px;text-align:center;background:var(--bg-alt);transition:all .2s;cursor:pointer;}
+  .dropzone:hover, .dropzone.over{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005);}
+  .dropzone-icon{font-size:32px;opacity:.7;margin-bottom:6px;}
+  .dropzone-text{font-size:13px;color:var(--ink-soft);}
+  .file-item{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-top:8px;font-size:13.5px;box-shadow:var(--shadow-sm);transition:all .15s;}
+  .file-item:hover{border-color:var(--ink-soft);}
+  .file-item .file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  .file-item .file-size{color:var(--muted);font-size:11.5px;flex-shrink:0;font-weight:500;}
+  .equip-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--blue-soft);color:var(--blue);border-radius:999px;font-size:13px;margin:4px;font-weight:600;border:1px solid transparent;transition:all .15s;}
+  .equip-chip:hover{border-color:var(--blue);}
+  .equip-chip button{background:none;border:none;color:var(--blue);cursor:pointer;font-size:14px;padding:0 2px;opacity:.7;}
+  .equip-chip button:hover{opacity:1;}
+  .brand-sub{color:var(--muted);font-size:13px;margin-top:4px;}
+  @media(max-width:640px){
+    .brand-img{height:42px;}
+    .brand-sub{display:none;}
+  }
+</style>
+
+<div id="app" class="min-h-screen">
+  <header class="border-b" style="border-color:var(--line);background:var(--card);">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+      <div>
+        <div class="brand"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMkAAABGCAYAAABmILAIAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAABBLElEQVR42u19d5xdVbX/d629z7n3Ts2kN0ISagolJEComQFEEEQQ7qAUAVFAUbEXUO9cFRWVp6CowYKiPnz3IqDSlDITekkAIQmkENInmZlMv+Wcs/devz/OnSQgJfhA3u+9WZ/PfDKTe0/bZ3/3Wuu7ygb+D0g6l1OA0I6/Rb2Z4zMiDBG6fVDGn//gC39uuu+pvvfd//SSbz/xwpk89PmwDMv/r5LJZBgANAARGSkiCQCA7ADN6wjlRBRyOSUidM79Sx7cu3WFzGtbJnve96wcd+/TcvXi5fN3AHFYhuX/N4BUVvhrFj/d9IG2Zx466I4nuk98YMmaq55cdsnOAHq14xa0tuqhvxnASyLvP/KxF+SIe5f0iMghH1r8wh/2emyd+1Tb4hsBYEEmo4dH/H+n/K97sSJCzfk8z5w5U2VbWsySINi/5eFn73poAIkpSY3FJWoogH52/dIXVl40e9/707mcyjc32/g4cH5Zi2SJHAAnInxLT//JT/cUP/y5B5457oWeCLtXa/rN1s0HlK3Um0hoMDKbAACNjUA2OzyjhkHyP1hjtLVxtrNTiMgCsACsD2DFxz527gsl8mdXo/DAsXOOaH505U8ecDx/2UDxLAD3jz/wQI1cDkPHEYA7162bdU9X70mnPfzcGZvhHVw2EUaVe7acMG5s32N9wcTvvVi4vjgYYHrQZQ7fY1zu1wA1Nja6RcPzaRgk/xPBsTyfp2w8wV1Fk1TfuHrT/s8O9J+6xpkjfriy89CNjmgk2P/p+i1f7SgWJmnSGjVYi0yGf7z33gEADIiMvWrx00e/xPrD313Xe8ymZG1CTBl7hYMbDqiuafnugqYcgKornnvx262rNk/cf2TKzJ089tqPzNr76YwIV7TPsPwvFHrnb0EIAoBI3gw4si0tQDbrAKBLZOYd7Z0nPL65a84GFx7dJf6UdlQhZIUxW9ajIZF6cQupPUx1LcQ57N3f8cKdJx62vyaKcpu3ntDa3nX6ShOc3m78hi7jg4zBHlHv2v1TquUnRx/yFyLq2fn6qqKqthMAb+Leh2UYJG9K0jlR+WayO36HA159wokItbS1qWxbm0M26xSA+7q791u0ftMFqwP6+IpEdaI9ClHoiRAEEaYkCLNh7j2mQV15ybwDH/n8A099uFMl35WkYNHCw+fc8Iv1mw98aEvnJ9dTIr0+VOjoLUJZixmecfulvB9dP2f6lTRiRPcQc5VLpx0ADPktmDWL0gDyzc12eBoNg+Rtd7QBKCIyrw2m2Lkesg9/9vzquU/2FVrWOnrPumQVb+kvgEoS2GLgjfEV74Xy6iNH1X7rm0ce+NvQydBzCgC0rm+f/bv2zm89z/77tjgP27b1RyYQvRuD9lCF29PzJl954fhpjzkAC1pbdVtjo6VhTTEMkn83KFoA1QK4Lz7+wpef7h08K6LIn8X+rddNmPs1mk2RiICIZGdNIyK131+76Zwn2zvOWB/aYzbXjMBAuQQukwkCQ7UCtUdQKBy5W/0N3z149teJqAcLF3q4+OJIAfj92i3H3rlh4/mbOHHOer8KPQMlFwUU1UIS06PBbQfX+1/+8YKDfhnFqFSSS7thcAzLvw0kmYzwrBbQdS1ttCjbZAHINx9/7mM3F/RPB2yEVELgOIWjCtt+vfD4+R9paWtTbQAWNTUZEaEfrF6Rfroj+O5SlZrWbi2C0EEZZyWIYMuiJvgGs5W55YKp47783ll7rgKAmbml/vLm2eHTPT1Tf7l8/VXLIjSvTSXQU7LCZbYmsnpyQjALA7//ym6TvjR3xu6bkclwetYsGjahhuXtB4kIZQBqa2vjRRUfYidNknoBOPqbjy773UM90cgvzRrz/b3qqh69bEXXn+ra13U9Nq96Ok05vAQAN3V0nPz3jdu+9kwQHvJiKECkjQdHthhwUIT1fU8f5Jejgz350A/efdgfHYAT7rwzcfd73hNoAN9dvvJr92zp//xSeHV9xkjSkZOSgRVS+yaofGRKff5Hx8y5zlRMq0VNTWZ4SgzLK0W/dbgQygN8XVsbLSIy2dgHcArAs8Xi7m1bt85dsS1ofN/Dy07qZzt9eXfRBYG4F7eVp4vWFG0raAoRJaYcXpK+vlEfX7b26z9b3f6p1ZzCoPFsSkC2VNJBMXISMKYkoQ+uc0+fN2O3T71r0qSHLlos3hIswd3z5gV3Prdyj98PFK76Q29w+oui4VmxiVC4EEAaQProOtv93nF1J5+9/8xHkWnVGbS57DBAhuXt0iSZTIaXv8JEERF9y8aXZj2wYdv8baxP2RjYxu5EdVWvMHrKAQbKZTMxmdCjrUKfJFCTSKI80IEzx3mX1aX8LQ/2FK9ZJd74jkjE95RIGLHrtbAhLKDV3tKPw8Z5l//omEO/T0Qmncv5+ebmUAG44umlZy/qD/5jdapmbF8xMImQlRQjBMbK7gnHR1X5d3zl8H0+OTWVemlYewzL2wqSjAhn83lCBRwiUn/Lpq5zHl/fvtfyQunYzYzZ3V4N+jShGERQRhy8hPHEentXpahRBffOGjPqljuXrXivqBQdv+eEVUsHukfd04OzNlgHR2ITTAoDIajfQ0Bsq1WkZvulzhNGpT7whQXz7geAzNKlfnb27PDZ/v59v/fMypanLZ/ZHimELCYVsI4MnNgS7auEjqzDlT9oPPQbRBTuzJgNy7C8pSBJ53Iqv2yZDPkZ/+jqmnzrhq3nrSnhU8sL0dgtzOi1Fi4yEK2NYpAisNPKkU6o/Qa7+08cW/PJK+bM/k8iMgTgvo6OBdeu3PDjJ1G1X3dx0CYUs2812Z4AtmjBzotqqp13ZDJYesGeDSe9a/bs9XMXLvbmzgWunzcvun3NhkNv2tJ9b9uAq+mz1nlQZKwhL/KcY8dz/CBqSnnNX2+adxsAyojQcIR8WN5ykFRW3u1+xsJlL825r6Prwq2R+9A6najdUrYQESuKREE4IWAoAYhhrbM6ZHWAH246Z1LNmRfst9/DyLRqaWl031i68sut/aUrlwWCooP1lSgqO6CzDI4YgSgz2oc+YZx64qfHzz2FiLZmli71s/m8QTbr/mPJc+fe3j1w7VORGgFJGJDVKFsYR06x4/kpKpy+x9gPXLT31NuH4x7D8raARESI8nlGc7NNEPCDp597999f6rh4o02e1l5dhz4bgZ1YrYjZAzER2AhQNqCCQbEQGq9U0EeM8pdePmef0w6fPWU1APIA+dgTT92wSKXOX9VTtJqZFCumQgjZVoIf+CjCmfHJSL97XOqPP37XvAuJqLhw8WLv4nnzIp8JX3nk6W/dPRhcscomwc5KKIZUWcM4sZqg5nBh4znjqt7z4cPnPTfsfwzL2wKSnYN5P1+y5LD724tfXmXUKWsNIyhbsK+s8hWzBjFpUEngBsqwBQMTRLBlF9WT8+ZVFe++/exTm2kMDQBAe0mmXv7Yk9e1wn/PVkMmyVaTUuC+CG5bhKRTUiRtpySK+vA6fOfX7zvy8lCAVhHdRGREZNyli5688nFJXvhiIbQ+KY4EhMhAxLPai9TBUtr0oSnTj/nggZNXDgNkWP47ol9LezS2tKl8M5m1HR0Tvrd4/dd/tWbgkhddEkExcpIU0QlWvrCigkNYCmF6DVzZwTmBDwE4YWsT5B0x0S65/qzjP0otLQUAWFGWGVc8vaztLqfH9oXWpJg0EUBdZUQ9FlWGUdTOTqwP9Un1ycx3j5/3DUmnVS6XQwUg9R+5/4nbHgq9+RtL5SiZYK+IMnSoQdDO85Q6wi9s/OSU6ccdO2Pyykxrqx6md4flLQWJiFDFZjffu3/J6R9tW3XNSutPai8nRWtySY8UOwXX71DuG4AZDKFCgecUdBTAKoFNJhwlnJqRKq+4/Ih93zuaqB2ZDD/Q1T/z8icW3/zgoIwtOkTaF0/IA3VZSNcgEqoGRSIzNel0YwKZ7xw/7xvItOpcS6M0E1kRGfWR+xbf9fdec/A2UOQnyIsigR95ALFlZXh/Lm86f8rI446dMXnFgmGADMtbDZJ0LqconozjP5J/9Kt/WDVw6WqtIBKZasUaIsqVgbC3ANMXggyBFcMHuVJfvwsGQ9bakUkEOHBKuef8gyan502d2g6A5LLLas9c+vzdj0bVuxVUZBUbT0GBu0OYrjISrBGYshmbUno/r/CNa055dwyQWZ0xQFauTHzo70/c/qBJHdzDyiQBz0YGviWEJBJQiQ9PeLZ5fMNpp87Yd8W/okFEhNDWotoANL7Bd9sq/zbuwnlb2uCyFTZQJMNoA7/pa3TOEqR3PZ9MMhlG447rDP27873kcjmVHrOMdvVedvk7jS3byRHJ5RRe5RpvZvy2y07nBQABqK01o97MOdragMZK7RFaskJxocau+SSZjHA2S05Eqs/9zwdaH+y3B3cEsJ7HpDyPWSyinhDBgAU7gSIFw9qSOLZ9vZSKQowflQQoiPp1nTe7IXzh75e9byYRiYjUf/C+xXffy2p+0WnjS6SFGYmuMqKOAjzxUCQ29crq945xN/+y+Zi0+XpGZ1paXJbIiUjy3L8+dNvDqHl3jxXDbLU4QkQC34mUJHD7I3SnTxqf/uL8WX/+32xi5dJQSKfR3JwfjvG8BSIZMGbliF4nZkYxQDKczWbdiq6uSZ+99cnbH+lVB5a1jTytPMUpmKKB6y1CIgJpD4DYAFrVpBh15W7UFbtXzZ4y7snjF8zaf5PVs5/Z1O/qil09LpDJvzm/MXHh/Uv+1urUoV3OGauc1sTwBhywYQAKGmKVUZr1UQ2Dj+TOOu5oas4jk0tLtrmZJJdLffSuB376iG04d1PZRlpZzyoHYgKcILRs9q6CPjkRfuybTYf/fEGr6EVN9KY1CBHJs/f+YtxIHjiBrYiDIigAng92AAhVgBoD52BMabOIjeAslHWA8gAvCSgFRAF5ieRoZ0wARcQJr6/YXVw07cTPrAWA1ff/dG5VNWajGDlnLDMsoBScqvSksA6wFnAWFgpgwBsxUvzqCStHzThxFRFtGwJLOpcRoqx7tWfZ1HrDvroqPDTs7xNyjsSIpOrqqZ9qH5t+5LkrQIQX7vjhsQ2qONkmagREBDs0TxTg+XAuBEWRB+iRQaFvq0omSHk6XnktwGDAVwArOABSDoSSCcKICfdP3u+0DSLCa+646sSE50aLcUJ+FUF54OpquLBcZOOSxFJnywOD8JKAVw04CzhJkUVCJbxa48wGhkUyWY3OsO7BfY46Y41kMkzZrHv+odtq/dJL51RRVOuYtolShi3DQYERvzsAcA5AWABgEVpX7i+YZbV7HBJOP+C4dUQcAAIBKJ9L86stPjoe1BaISPUZN95/70PF5L6hFqOZPTaMaKAIOxBCiQ9WJGXjpDqp1BRdxO5VwW17jx28+pqLLnyciaKbZH3q9i0NCw/eb7dzVy95/lefPGJmuW7qM7ffY9WhvUEYwSPPswqqDJj2PniSgGHltLb6gGTppW8ceWCaYs1BzXlQ4tZbbcuDz+UeGeQT15tC5HnsCTGIGSSCSNhMrvf1YTL4g281Hf7zixYv9q6fR9GbXU3aWhoVAOM2P9M0Jlr6m7CvB+z5YCYwaRAAcnGFsHMOTuJ5QkTxZ0pBQHBwEGvB5OI2X84gMWIU1tQc/EcAHwQAt/aZr06Inj21UCiDPQViBhMNTXBABJCYABEIwA6kkyhQLXofv3Hb5tyn/urtN+e3Y2Zc0AbK7uxDvuxZwvYl35hYeDxd6u8HdAoiDlUNI9GVOOAHAL7AOgG/5/nrx3Y+PL1MCbBWECZwpfxGRGCtBcQgflyJn5UIRApEDGIVr7NEsEyQchHemMnYZE/+EoDvbQFStPbR342zaxpCYTBrMGuIUnDGgCkeNcDBioIQgcEgCFjizwz7gA2RHDkWxVFHfw3At9Y2wkcW5dHc2Viz4e6fus4XQckqgDUUaYAobnEzZCgJAGcgYuFMhPrQoPTSX+3WR/5jU+9tn362OHHuT+nQC+5Cc97m0mnVnH85UHRzPs8eZe1Zvzz0Px8arNo3cjYiTZ4yDNNXhikJmDWME0NhQU+pcrRHLd/auM+k73/tlEMfvRvAtRefhwWZVk00pSQiFzzZ3X3TJ46YedfXHljyvf/qLR671ZFJaPZgHRKWEG4uQgUKllmEDKZzceDUA8Z9YMbuYzZnRLilrY3zzU3m2iXPZ3//Yv+J64qI/AR5ZC2cZhAAB7I1HvQhbvDx64477Cs/zeXUwrlzzfX/DdVbk9RJv6PdUN8GY6G1AoEqAy1KACcAc6xZWEBgAAIhQODAFfDAEcAODGURbFPJugNrh65RFfUW0fWC0UFohFkT8cv1uhGIEJgAYoIQg0hQ76wiUqPqEvXn97Y/dv7m2z6Vqz7hkq8R0UqRDO/QKHE7Ci/sDNGxzPhBZBwrTZQwcD26asxu0RAgfTPYjv71U9gYB2aOn4UBieeVAgDHAAPiAIbEzysEgGBJwAIoYjA7KCu27MrK1nY+DwDjAe7k4iD3rK/1HDmxwoADgaAYpODEEcMJgV28QDAobiPIAhBBwwOZkkHYo73qWSEATO2MfYqu7r7NvHWtqStsEltKEDkHgYAq90scvztnK7hxAJiomqDqsFFRUU/hwvIpaH/i5C03fbCtPO3Eb0099IP3CcCV1UcAQOebm+1luUfPv31rcMo2C1MLeMYAUV8ZKAt8IgRGbE2S9H6j1ZZ5k0Zc8sNzjvnz32M7jTNoQTZLsigb135QS4sgm73rpjWbz/3xC+u+sEZg69hXZTJIiUbYMQgqWPiKUXLOTvZFHzpSffRjB895IhP3unLZpibzm0ef3f+XqzZ/8fmSbxO+1lYs4HvxSuachEQ4wneDF+27x8VEZDIi/K9G0hsbG4HsIiTHTzzAdfisBmuYSDOswMKKIwMlGlYpxWQhmiFgsDNwooZWQ+tAYKUgHhPgACsCAUl5cLt2Mz6U+FVaxAOENERgpTL1HDnRCoocxYghEANOiAwxsSuLlPqdP9hDI21n86Zb+g9fJ7I/EfW8UqMAmuDVaSMRWKw2zicuG+XVjJwDMMQEsMW+ZahtOEwGB50TMKyTuFWZQJPAqQSTEhICSAiAhYiGgwgE4shBnBURiWet1hxBc2Gwq71yEwzte5Z9bUg5ImERU9EUypkK4AQC0kwEgrUkgAOJi+FEDFYJIq+G2Kt52fvtsdRXq6p0racg5MGxQgyUeBmAY3FMcORABBFNABE5gjgGmJxQuSRe4XlKDaxr7O9a27j+tq9cRe//wZdBRHHtH4R7e3sbFm/sunJz0YpHlq0A6DdQJQvipJTEc2NToo6eiJsWXnbKMT8455g/23ROZUQY2azLZslVFBpaWlooPWsWDYiM+/OGzT9bZiE1rNmQJU0E11OG6wmhIQiNs/VK9F4Y/NW1ze/6r4sWLvRaGhtttgUQkUR+/Zb8qqgmqTwm54RIK5AGQA5FJ25PZVVTQ+qSo3Yb949Ma6t+S3KxBsHsiB3BFwaLR5yoSqhUKqF87SsXRSAQWGxcD0wKIhZsSvAVVCqVUAnfU1ocaxFmdh5SVcqSrhu6BIuKSCUqJlYML4GDE0uppFJJn5QwmBWYNbE4yxz0kWfKVgmTUp7SqSoOBnvDMRv/Ntn+9qy/ikiipaWFBCBgQXwdTwMqtsmNEEiMsNIo9vWsBBxADNKp8TCWbUg+C9j3kiqVqlKp6hqlE0kFsYQKXEECQwyBA1yZPAlZO8sJT6tEKqVSqZRKaesxFItfXwUAa4HAWhsyONb9DDBpOHiwTJxIeirpa5VKJpXHmgmKk0lPJauSKlFVpRJV1SqZSimdqE5wdUpZrat2fl0NPiuFWNsKYnAIKYgzIEQEOGYxrEm4KumpZIKVx8IeCSkbOEABrBUrj02pZP2tT7mxL/3pS1vyl/5RRBTyaRYR0p+54+kPrDHJiZGzzrfMruxgQgftaYlcKFPrDM+pCz9686Wn//LWS4EFmVa9KNtksq8Sq1/e0kJ5Itvwt0e+8rCqqw60MilrNZTAKzhEHUX4TgHsnBXhqdK3/tbmmZ+j+3Jq4UVp09jSppBtMhfsf8+PlnLD3mJglU/KaAaSGgQDI7D15NSBLlj4+Xnz//BWxELyncsFAPolcbs38cjjoqqOSFXVj2Q4FwxsW4EgDFFVN7Lad4e7NQ9Lgi2Js2AQWAIZmDgnHKza/Rk3sKXL8/ykVz16b2IGhYVeBtaZ1PjWIad6602X7O7KJTgnJCIgQAiKBsccWOjVY1v9BI2T6urxCAMTBoU+ReEoDHTv1mC2KfR3CLNHcA6OEr4aKJppiaeOeCH/+fOy2auvb8ws0EPmFkUhYCM4awFiCHtAIgWtqD++F0fLq6bev61+zOzAFBlhENog3KacLRgbBVxTX19T2jg32bEsqUiTJSBehwj905rKzh/TwRJQONC/XkzYI0ojoaSeG3afmhwxvgwAUwHaKobIWZBwrDHECSfqaGC3ueu3leyz2kRsxDpV3TCJE9Wj7WDvixA3KKRISGJ946xL1jRwSdU+DgBLetp3aBSJYjNYaZAIxEUop0ZJNHFOuzPaKjhYz4eUeleJ0lU6lZxkuzfUjeSBeu7bBBc5J2CGI6WVB9q6MRynW89c85fPrNqjOf81yTUrvaazN90TVolHSshZuFCgiKRM2k1NDapTpnsfvvrs029AplVnWhpd9jUaNmQyGc4S2V8seXbuwi2FT3Qa66qsqEg5KOfDdvRChbGdGFiScVzkA+v1x2jkHn3pXE415/O8KNtsvvHQo6f8dZO9pLcoxudIiyOoag+RFrCD2NDxvJQLfnNC4+W/FaHGlpb/dlO4IUZj5kmfvkdEZnOiWlxQ8GPnnENAAJ3E1jsyLbVbn83Ywa1WACUQm0gq1Vm/15NTz/nPo+BKiM1Z61dOHW2PFwCkElXS/vuPjJDIQRgEIjDBUSqhwt1mP7LbKde8FyoBMWUfgJBfFUlYTHauXTRjcNntlyVfvP881fOSEHsEZ2C9JNnBba66Z/WnReQGEJklF83VwBKIDWNjPDbDY3WgBUpx7AS1LlCzmr5/jYhcV3E/DLFvIaZytx62/ufZt9R3P3+aKxsTKdYKofGrx2iZPP/a8cd88WsANLFfhAxZkx5EQn8sUThkXdqoDBhbsVsYBOOCqgYV7fP+j+4274N/396jw0tBwqJPpMOdGja9Qn4DAJi7eYIFgKDUK85GEBf7hcwiBEPRiKmlcR/6r8MAbKl4ekKkQ7CC2CC5tmPtiMFVN5+K1Q99IbHpiekoFZzSCWYHBKlqj7auNnVq1Jc3Pn3DnzDngn9wZ2+wpw0NkY0YYew4GrAblXDq0HH4ztVnn3TD3IsWesg2mdcyaUSEsi0tIiJjH+0O71hhlPKthRUQg6C6S7CDBpoJAZFNKFIzaujvPznvPXemczk1M52W/LJlsq6wbuIDm6JfryoplxLHVgQuqYGEgIlg4Lup1Qlq3G301QB60vk8Z7PZtyzlPbZBSSQsgohCIgolIyzX7JmAKVN3+8p1ns8gYSF28UtnBSr1ObgiyVx4knE8dCwRiaShJJPhtswC5cISwv6u51RVCgQ4othU8JyDKg5A0mmVsYGuHBshKoGIymOnNT499uT/OL9v4tE3JKuriExkEDu3yjmiVLl7r/VP/mk3AiQ5YToBgENMzWrWcKxi1iwK4axTQ9G8TAZMRIaIgjiIHJFkhCUNXyQiGeyxJA5GDJwTUCQQUij0bO4nohBEZZGIJA0laShBRPGYgbdzyc6Sg42ZOgDCRDoqIljxSBCPzQxf0lCVZw0zsLz9fK/4eWXv5kSiLqEo9g1FLJzETKEoYBBbypVxDIgoFFgWFxIRlaeNm7ZlzJFf+Ll33m3zCjNPfyBZXc0qtNZqBR+OyE9idGmtNkvu/jqBhJN+7W6RsSARspGBCBwRqz2o9/nfX/y+ryKT0UsWXvS65kxjW5sCkXzxrife9VDBjEPZGjjDhgS6DETbBuG72F0zENrNK4enz5n6aQehmem0LM/nCdms+8oda696flCPQhA56wwLE1Cl4CBw0DaZ9NSBqvzYl2fvewW1tFC+0gvrLcv2JIhUTHARIREhysK17T/JAhCkvAScBTNXfggQh5jB1YIlsJSFGzpWAKI8LO0MZE8zVJypACI4J3Di4KwF5W+2s9KQ+Pih+wDJ4oWeZBwn95j/s8HEblYhYmGFmMaJXA0VtOtacwAA+CMHCACU5wOs4i5mzkFEINbBCSeHbiWbhRMBDV2PAKEsHNKwBIgJY94OTCAmOEUgrUBOtIgQFl+kCBDKw1I+PkZECC2ZyhVKY/xEbYONLERAkCFmTEEDaJsJWjUypLaZiIGWWaAbMws4D6Bt5gJqmwlqmwlCOg3Kww4tiG2NMQhHjR83s74qATKRGbL+mRkKCoRaVXkPLCJEMecoQ+9maS7jjyDqGX/qlR/tm/7ubZFHih2LsAcHqGCgS5LF9vduWvz7I3UQBFs9SoyDcSJOyDi4UUnH08Ymf0JEbkGmlRe9AWvU2Nbm2kT42Jvu/9Imr1o8gF1okfAVXE8AKQiICcaRG13Faka1/eF5h+33fNyJvcXlm5vdTx58fNbPnu1+/wBqre+JiqwBJXyIciALcSy0Z7loFkyo/exNANKzZlH+bSicogoJsTNT1LgDRZXPKjpcHCAWIvYVYHu98XKIJ4tUtkwRsDAUe696PBFE5CKDuRdh49pnVk2K1ECV740gQMiBnIj4YsQjGQcAXl0pni/KwxAXKhBAVGzy2PLAKxeG10wGZwaYYpeYCKwZFHvfQkQirRn554WGRLb/b2qrRFG37/vVZSfiRAjOivI9VM+eW9V0Ngyw2uzgv3c2nHf+Pf/q92eJmGKmERTT9UOhJhSqhWpIhtpTvcrYhtKa0UT1K7c+84ezg+5Vd1ZvWgZSSRJiIpAdbbboLS89da6uS0QveTYxFsQOsApKq7pwoHDwhDG3/wGgRrx+I+h0Lqeyzc2279D3nLfeS+3HgbPQpJQAqmRQ7imBieHEiFVVPE76uz91xJ7f/wOEGtHilufzxIC7a9XWq3p0fZU2kRWrCAkGJT04ETA8W5f09J5h8e5L5u7/6DtVessuXr1FEAcUBQCr2HF8Q6mMopF4ZXcyFIerGCKv05NjyfUa8y42E5/Lz6xKqrpowDnSYBaBpQRF0AT2NgFA1J+KfaAhn0SGAoAMEEOx2uUNh0gTQBrEsbYkRxBx4H/KwHodE9bTsVONODgqQuyK3TDL7vneut+c/SFtInLWEHuJpDNhUZRHpP0qtmHBkZZkQlOvN2HFnmd8Ozs0yRvbYsZ5oKt3OZUd6r2UosoVnDUQGwDVhTd+vqasyaXTatyB5/9t7a9OWdaQemE/Y51zUAz2yBUL4IH2uXpKyuRXRW5+v/jERKItkeeCnsve27Dl04BkWwBkXyedI96iYPTJf2r79ubAkwQxwxJYAWFvEShGYKURMdvapK8n+/ZXh86cuW1BplUvnzVL8s3N9tq7Hznk12u6TyyF4jwNFTgLrkrCaYAjhiPwuGK/OWj3uuwfRAj5/DuS56Msx6rGSSX+XEnhcBXnM/PaY7XzoGG7JoqDcxZApBgZCPesAWewI+kuCziad3EE0lj/wqOfHlnczBZsTRzUF0WkejkZ8OQDngWAsLtW4gBaGEeZh2INxAAY2IWEvu2Woe9XNJIBwcbPaSNot+sKXHbSSiQCZkWu0I+6NffOHptMzYY4QEy80BDF2g8AFAHCgFgUG47sBfBtIgpFQGiJv1K2g6UkBFBMGMpUFAeyFkBhl+5vzMwOEoS0of6Sp6i3dj8pFOKQsQjbsARQdBB/4cTGG3dTg90UhiCBQxQhDG2qbW1U9YasEMAgkh8+sPSgl4w30UYi4kBwDhQCti8AOYCsEyNajS9vHTx9/5HXAUKNaNs+0g9uKX2+ixqYmJ0RgfMIKuXFCzWxJU08SQXPfnn27CfQ0vLvbx7XNpRWVTGVds4NrRjzbySds+JQsPIT1SIunhAQwAHKKLBOuCy0u3iJjrLQLv7xnIhwuW/NPltu+/SN49vvT0uh0znlK0UWLJHzUXal5NjVK2Yes0kAKrevkTiKp7CdORqyMOIQ567vyMVqyEOLnTXn4lA23oyVWzH3qGLLEoOVhhPromK/CcsFUw4jUwqNLYWhCUolUyoVTalQMqY0GNqgZDyPe18FdjAaHE8wt10rUyX+VP2mTGwSVTu2KCpR8THjhYXEwJYHSM/bd1LXOQtvy/ZvlWs29QSRA6OUbBj1u/u2HAHgznQenH8NTi7f0iIM4KnB3ku7TFJ8WGetYZ8ZphjBlSyYFEIR55NRY3TYdu4RR6xDOqfQ0iJ5IvvbJStmXPfkhvcNhnAeWx0Igas8OB2v2CEijCVf9k3W/eoOgBY0NvKit5DRetPiYv+KaAdIts/A19EiY5ZVHFcXBbT9OIIj4sAMwOtYduimmy99mEyZiLRAHElYRPuvTqvhUveM+lK7dv1bnCSqmMlBSMOawKFhiqcm7ff7JiLTGsdJYr9J6dinINnO/MAJRHTVrj6qtS9/7ZYdiBxcFL4ZzjB2jaSCVyaQCLQJCOIUg6CciMQ5PwpwYIqJAs0MS0rBmhA7b3o5JAMBKLIg4yDaAazATHACdBTexB0KaNUtnSvpFb5lnMUi0Ol0Tv3uovf97KTv33RCt197YjHSpYJw6qXu4iUM3NGxrI1eJ3PWWZERh//+3sPLNkkEp+K0HoEZDEDioEgQOsYYFuw5ftRf/wbQgpljqK2ljQC4thXtH95KNb5ja6xoFuWAao1IBAQSZ0SNtwU5c8bsu68G5J3cLEfBbgeFKNo+CXbFfmmcBSEiGGe0WAexDiAFhhAJo37L0yPUtqWHE0nFAY0THcVGsCaEI8+KrlJwgGgGGxtW1Y/0N9TNeXy3E79xjWSY0dJi21oo1hQV88rR9uyz2EuPigO7vMLaeKrECwKDOI6fMPtvatTioFCF8UBMBJTrphFAcBZgVuR7CkEUQbQHdqqS3Gl1yvNQSoxkVNKxXn7uECQWrjK5h5IzifnNaRKCbPxDOJui8pDnBAuIl0iSEbeBZ85MCxFFv/jCBz90yCS3tCqhUgOBF24seSdfcfOi0xdlm8xFCxdWqJdKZhuAfD72366854lDeyk5OjKRYxeTqC60sMUIWgBnScQwj7EDgx9uOuRvAKSxpdEtyjZZkaX+i10Dp3aXASWOxQk4qaB8L85EJXJaCXarpucOnlK/GSKUZf73a5HGIbPaAyp+rwwxVNsn4RtE9fPx21CcqIqpWCHnLJxzcVoFkzgb2cgYG9rIRs7YSJw1pJ141QKlFUHgKIRXGBC/OuFvGbn/Gn3EeWcSUemVrJg10VDgp5KxGzNA2vNp13WAreSZIz4HEVhrcCK5yyVTLorgnNk+G2Ejq+vHwx101lW9cz41v2e/sw8vHXTBCaX5nzynuN/Z8wcOuOCw3lkXzO/a+9z5vbM/dGjfoR+bL5OOes/QrgMvZw59uO3cnFSYLamApHoXNIhQGxqdiNRFxYEmM7ANIsLOOTA50Z4HlRzVriuFVkREXfJ85+FNf2n79QvF2jNe7Fbuz89u/PEv7m79x0dPaFqNixZ6uL6Shp7OqevGxBrmH519C7qDOogYB8fMiiGBBYcEAcNC22pPdK0Kb507sWodFmT08nxeALiWO7bO6xRvDwmNgxZ2YoGkF/vBAKyBjPd9jFfhdURUXtDaqheJvGPFVA6qwplKbOYTAKbtDvjrOe7NeVhOJJGoGrGHMwbETOJkhy8vAoEVIkAcVZhURcLEDBenpTsL5VgGRu5jwimH/j158HmfaJh22LqXZwEPLY87wAyO83fBBO2pHfP7jUgGQoVC3mnJJQb0m9AkEkFsJdAHBomFCMMG3Db9hAsf/1fo+e1/JxWBaLt7F5uWcbJloXoXdEm+xctms+FlJ004ZbzbNN1aa8CiAQsxoYRVI5ykJjygh9CZyWSYZowZ0IT0aT+46QvPmarvrApHTfj5k71/W3jnQ8d/7D1HvmhlqQ/MEiKKFuVjLby5P5hbdg6KhBxZkCW4sgELgxTDCVO9F2CvCSPvuU+EFrS1oaMtBv+zm4P3d1AVMUIrRrFTDjqhEcHG9QSs1eigHBw9tv5v11biMe/svoT25bb2EE1Fu97jz7k4ygjC9tVdiYHRKUrW1mu2gsgJoD1QsRtRuSBGp0jDwGlynngc7X3E2vGn/vJkuJ8jl8spop2JjAUAFkEpDSgFpti8oQrzY8wuKOL8jqACXAXAtDNhscvK3JEzjolAlQ3NxEF8reFVN8zJ5dL3pGvGa6RGxvdfyaHbmbtMA8CymfJqpbahcdGQNgdVGEfZzpDtFJB9hTvT0kJLJrYras6GIpLc+ItTP1mzbaXYZDWzc3DEMEFIVDeJRx7Q9JjeEX3NVjRKC+U/98HvX3nXY4/dsXjj17ZGyXf9+L4VDx7znfwDUz/x0BFV+iGc9s3f/u6Wr34oA3QlD/3J4gMCF8IDM9jG2d8lC1ClNoCZU2SjWaP9x0EkjZmMy2ZbREToqO/+sTGQJMCOyFpIEnAkcFagWFtfJ9RoM/js6QfN3IhK9eQ7ihEVAc7GMUV2gCjAOZDmN3Tcc2moM/9UtuViz2r2vL3YWoFScERiLagw/diuwb0O/120/qVVA93tm6omT59UY/s/kHr+r0frwa1OVJJhwCEC5617as9Vt3z1Q3ud+tUbx4xZ9uo+o1I7HHcA5ASwBmbIGX+9EMfMODK95YazqsTFaeux1osBA/NGyjxDQFaA3snarx0XhiHI90mIQUqzMRFKHWsWI58HOmBpEQwAyqXBr4FXaqbte2JSPt9MADB21JhJVQkPUhLHithS5bmF0Nu/Kayph0iGmLL/hGoB4DZ1vrTv5j9e+PPR2xYfEoTWaWYm0vAktKquXm1K7XH3lH3f+zf9KpFiQSajrzhx/oMJxvGfvfG+s+56PvHDRzeUzxxN7Pqc7/5RqPvKB77zu+7vfuX9vy+IjLORgUeKRAsockAUozpicoqJU8ps/sR7jtvwSYDQ0gJkSR5ev27iYCgzI1NEIuHFJUyeVyk8AixpqfUYNaQXEZFd0NqqF73DILEuckN2/lCqe+wQv7HvPmYmSPIWToJuSmigbAUCKOec52vVB714wrxLPvsKmznXGZSXj3j292Mjx6IpopB9qu9ZinJi9HVrnn/o8ekzjlzxquZWvAHxdvODKwk3uxRJnAUiItdx/RkDpBRcYOBUvFMfwW33U15bKsG1sFyj/GTSxTQ5VehZYe2hbvos05wnC+1DpJwknSw35wO7Y1MyehndKyJMOuGISBYvvogB2Kra2qlVCQ8kzgKKiQiORJRWPL5u0iQR6SH2nUiY3MmAxKZND0/RLzx4Mv76uctHdy0eGRX7LJSv2EZwlBKNSHpGzQ9pvzO+SESDrx7mzWZNHNXO4zvnHPufB3z+Vx+q91LH3nHuQXtsmbT/+Et/0fbw4nXr3v33P958a39/fRx0goUDQZEDGQcHBmxcf1Sr1RpNVAIyvDyfJwC4a8n66f0umWInQsaRgUDpJJyzII7zmXxXxmgOnsX/EFE6VbXDad/hsJPSvojh1ze7KmYQaz2EKnEW7AgODMNOS2urvuuWj6oTj5pjgJmKiLZtXXrn6f2dL91Xv+UxFXGCPefIRJ4b3fl4TeeTP/+jiByOPIU7iq6GIvsBYEJw5OIyYeIKRboLMKnkj2294QO14hxYxcHIOHPS7HDEX1MdVZxrf/yLUVTcXFddNTECOwjYkcc00I2Bf9y2cP0vTl2tlD9i658unbLxl6dtggm3QWmK6wji/cKFhCgKZetvm6etvenjfSNPuOTk2tqbugEgDKLOshUkNXNcGAbSjpHsWZ/ccNPZD1Ohf9Oaa9/VtenG5qkILOAcWVcWDvvGjqIBz/ZsgCOyzqtSngvgoIRNj40mH6h7Jh516d4HnPSctGb0a+ZC5JubbTqXUzmk1SFLiqVQEvoz9679wLTR3alioahH1qZ6zeh99+X2friADGloAQORwDgLLYBREE8lUKvdcgdgQaaRO5bF59/cU5wa+dVgG1kBazgHaEKcjUVgcZSMrOwxZtS2IT/znfJH2ipzoaZ2wh4gL+b4nENc0KogplIn+roR9/julXESR5njKHRcISdQ7Ak1HWNyaRFqXm0BWGnNaJr9nofW/uXrP2gorrmctm01zktp1sISlczE3ucO3PCXK781pRmfW7zwYg9AtMMyrDST0LHvQ6CK+YU3dtzzIGom1/6r04qkeEf9q4mLzLDrBKMBYKhSEgw4MIhceQANGxbtlfT1Xi4SRGstPN+bxEoBbHcEarcfB7jNfeiffAgwWBxLddkuAOju2LaKQosqpZRUcukce9ClDox84Y6ahKf3YeXvY7aF260sFoETgzKTIZVUCqIYgLBvxYRixu6tt40/8kd7n/z1n+ZyaUVNWfO6y8rMZWmh5mY3f9+xV43Vg4VlfYmr/rKi0JIqdAUH7lbz3Rc7Bj2oSrcMF9eAWxPTmtZaGGshJsSYuurCP9kjrGcE7MOyBzPk1AGAFegIEplAJYpFGo3oJQCExsZ3zNRqrDCdQe+mpVB6O60a+4wMsTYg2rWZQxVfIW4ysSPwDiuvFul3kkur3d+b/dG2yU2dWlnNCJ1THsSv06W+zWZk10Of7Xri5uPmXXx9JLnc9mi6U3FKCVWyhQUGcBEczK6mXUEpLVB+THMPxYfwpiqkCcJxCuVOTS6gGQJy5cDYEM5Kgl0EY0tR2ZaLzpYK1pYGrS2VQluOAhuYyBqlXCRspTq53SHSCU8zV5Iu4xI4WCEIFJirJHK+CyOxVnnOac85nXCRTrlI1wtzUmlrBQIDV3Lk+0r2OUp3z2q+fMqp//GZ1sxReqjO6HVBks2Sy2Qy9OML3vPYh+fvtmDeiODHeyX6vnfGAeOO/u1lZy/pKYY1TjhuXFChE8TFKdkkgDgHisrY2L7tH698M6UoGBVVHshVku+YFMgBIVlhBYzyVPeH5h/0YjyNWt5xcytyFrBlo2AMwxgNa2ADQ0PZiq9LqS6omGzsQNawBIZsYDgqGTJFAxf+E8gom3VYNlOIqDN14Blndk88rJhAySWkFPm2aBIUuOrND4d4Pvdj6XlmGtLNbsysNAOA8jwHglHiDJuykSgwMMaw2/VZTlAOcEbZ0KioZMiGhoUM213vJaDEWpbQaAkMu8CwKRtlA6Ns4MiFQqYsbIqObFnYlYVpUBQGRdGgaCmKsoGQLQtJ4GAtEEbbbdqouDUiWzZajGE3aJQMGO0GjHL9hl2fVdLvlAwK27IjEzi2gVO27LQZcNqWiUlxMpHQ0egZvHXqiY/YOWefvtuxme9ILq2O+cYDO8D4Rg+ZzWZdJpPhz592zBIASwDgQcSViD2eAkHFoCCB4zjDlaSSRg6BAiHp/XObn4FC0UCSca6Mq1AXxBAQUqIIL222a9evMe/+y+1niEiOiOw/eXP/5tytsq3yUD1ei1Pa8xWcUxo+oUjJmjc2tyqLA9dXoW6iFunTmgnioFFdjbKuf1Vin7JZJ60ZTXsd17r2nu99OUq6a3XPOghpMARlQxglnfuuvOeWH+7TTKe2ZjoYAIpeQxVG7K5FurRSHgSk0TAKEY/xdzVO0o+aqtH1E7RDSitmwEFj1HQEPMLfYbO9vhHcT7UjR9WN1WQAXWmUEQc8KM6Dc9vLsWI2vVID43ZawR0x2IXQ1WOAINh+7oYx06dVdU/RtqcETycAxOUAcbcX2V6SwBRbuEQMKA2jE+h2SaOqx691tePvTE6fc8eUuRfeQ0SSS0PRK3pv7dKeiTFQhNvQwnGKxSzONjeH37rt3oLudhDnSECwlWZtzsYnJiJY0UimvPp/miyRR+IUrLNgCEQJnHXwOQFZtpKKjz2mFGPsSk//4eizPnumiLy/0onl3w+SljaLLCFK7nPbxtTIPls9IPA1MTnnJz0ObOolwAEtIsi+uvPeWDlHYeTe32gvN/yp5PU7y+Bkwne6voHL1LAaEKRz26u4dgClKWskl1b0ri/++Pm/XrWuvmpTndXJamuiArMW36uVskkWYjw3hsAi9NTP+KaqarhVEhtd5NWxlyDxUyOoLxwZB/Aa2+xr1pGk4wyQ3tH7ZbZi0h9LtQXnWLGSSFTNeNrGYx+tPJR9NaTtFM8w0e5Hnt8e7VEdhiRwQlAKihWsYtgoAqyFtYDyFXxWgGLYKDbXlVJQngdhFrKBMskJKiqOWLudv6satXzruGMvTE04ci9b7F9mlReTes7BMiot6hzYIy8oGs3GFFOjR1Jy5PgBHrXXsjF7Nq6l7eXoH4HkcurVOjn+S9vBDXV8/OnNt0//4QvhCy+5ek+JBchARQIzGEGRhoE11cmkPm1m4sc3nNP4qQWZVg0Ai7JNpumqv/5kcbn+0sFyaDSJBhlUTaiBx5EbvKuNJ5n+xw+cOenLTy5d96n6utrTTj1q7yO/+akLHv4/vo3bO6NJ/xdLa2aBbpw1VtCcd/QaY/sv7b6brazmHzv9pA0Lv/Ff7exkiljnmA3DMVjFDhSDIaSwfP2Wf4o+1adSHhcc2No4KiwCWw6gOBTnLHxfbb77uivaDjzjirMKolGKUAsAHcuW0Ts1oCJCbW0tKqa7Grc79fnO5bKrvXm3N7Jua3sZM9DYCPfPsY5XuYVcTrUtu45elljWCDR2zhJ62eauGW5rA7/yXndumP3Gz1tp7r39HG1AYyPa3sw5Xu1+X82Wfa1csMaXf60pmzWvfB+NaKs8ZuPrEBJtO431LEHLskoUf5HZlZXpX5OMsLRAGr+Tv/eJwshjSAJr2SoGwwWVFjKKrdZVakbVtrufvuKME206rRbM/DgtyjaZ91395y891Fvz3f5S2TApLc5ANygkx1Wj9OgT8P/xHHYbP6J9gBITRqXs81d//ORDmpoaC9sLHP6Nks6J6hjTRo0AWoa3k/s/J/yvHrgAbUxEMjpJdyW5jMhByKk4k1wxKKbkyTqLkrGzTXt7NfJ511jhUxs8tzbhSnDObW/RZgOL0DhUzZkLdfiRslqqJqS0Mo2N8z7S1NQ0mE7n+R0wNyjfTHZRU5PJNjWZYYAMg2TXYweVysIZ45J/ro96QmNFxRkacUNlF/ccZxdZN2D8iVfc9eQ+AKR95fUEALPGJ55LlLdZ56ABCyKGCQUSWgz6PuiQQ6h6/vyo6ET1tm8ZC4A6Ov69ppaIkALkly+sPvbTjz333WtXrMuKSPXQZ8PTZxgkb8h4IZPh7557yqrxPj+dTPgg1lYh7tEplXI0InGDSPKz7eXjAWDJknh1/nz6xJXVWtZQXJ/hhCpd9wOLJBkUikXQ2JHcW1VPy1/a+imtlCxqxL8toFjZ0Ei+/PSyll+3l++9ueR/6fru6OsfeegftynELV2Hp88wSHbB5Gpk4wSzptRfPcoTipyK27vENCDippiGB4shOgJ3gYjwkusvMgsyrYqIzNQxtY8kEgzHnmOPwR7BFi3IEZQLIR4pNbLBdfaVmq645rdHI5uVdDqn3u5BERHKNzdbkb5RrRu7P7elMFg8tR43UHf/i09J4rgfLF11SjabdWkRNTyFhkHyurIoe4xBJsO/vPCkW6Z7A896yikLbZ0wFAQiDuSEYZzrsv7e37h9yfsAwthZnQwAs8bUXTNBFawlxQSCJg0XWpiCAQQISgH8yROl03q4+95HMkyQjo7r3vYVvKXCDvzXym2Tt5akZu8ar/jjOXtfNm983WOl2irbB3sUAHS0tQ1rk2GQvOGaiwxaQES2aVrNx/bwi4A1AidxUzAB2DG09mSLSeLRZWsvVIAgD5tO59T3znvX01NTwZ+rk5od2BAAbRmuLy7wR2BRrK1WPHW6XdcdHXP8OZelFy1aZBYsWKD/HYNzwt7TBveorwoefbFv1En3P9m+aF3XWQ3dPWpabeq/AGBsZ+ewEz8Mkl3xTcil0zmV/eAJj+xVE329joymyFjAxs1r2AIkqmzhNgT6xO/f8cgR+XzaNRw3nQVCR00b8ZWJrrtskUAicsIiMCUL1xeChBAZC2/6dCqNGCcvbin98nPX3zht0aJF5u00u1oqrFY9YCBkOalpaWdUPc736JiGxI8+vPvuizMi/H84qDkMkjcr+Xyzw4KM/stn09/cv6rrT54XaGs5ckRwWkFIIalY1oU1/NdnN12rQHL9vWvcgkyLyn7wpJUH1JlvjvUGdYHIEhEUMWwxggscdMQoegmuPuhAaXfVda13PXWbiPj5fLNNp9NvOVBEhOZdfL3SgJx+2yNXrilw1XmTR9zy/cP2PfNr86Yd8O2DZnzGQij7NrRYHZb/mUJv4ewi5PMs6TQ1fTN31z+i2uMGIoo0QZMDkQgC5dtRXFbHjBz8zB8/94EfLci06rGzOuW2D37ALvj6wlsfHxx9agQv0oq9uDWGwK9JIkowtHZIrt9ow6eeUpMTfbctvfuGc4iokE6nVT7/1uxEW9mpSyGbNZfe+fCVd/V5l8/UZslfzzjsMKJKkqYIYThWMqxJ/jW4kUi8z7ht/VrzKfNroj+O8+MWhKLIiSIkZJD7Q7HP9Po//MKN9566KNtksAwqsl/je75+2JmH1tnnktVJLyIv8lhBQ8GUIvjFEFFgEI0bq7x99rbry8lTD05/5pHPXH31pHw+b7FggX5lW/43K0PbyaW+9U1z2V2P/eAvawuXjx7oXP37GZOPJ6LoosWLvYwIDwNkWJO8NasxkTCA9A9zVzzdq7+51tQR28hocoqdFROFtEciKJ43zRz0+YvOW3nCNXcm7r7sxPDeFSsnfvO2529YEda9q7NoTJIdO0dMMFCeIPIUktpCrd9oysue1pNSdt2RB+114Q3f+dJ9AgALFuhMY+Or5hWl02nVMXMmjV2+XF6peRa0tupFTfGejxfc/Oj327YWP1dlyps+ccD0Ez7eNHPp//GkymGQvB0nFRGi5jwj32w//4d7jnt0Tc+1L5bUjB7rg6GNIkMmjNTsGt5y7jEjzrqssbF1z2uuSay+7LJARPTpP7z5+08Xaj69sSDQwkYRlJAlYoFLMDxfIdHXbYsrVqgxYb/MnFT3i5MbD/jOxz542tohDZlO5yifSw91VoupuJ00aC6Xo+uWLaNFlYS5hzcXd7/y7sevf7KrfPy+NbL5s00HnXDajPHPpXOi8s00DJBhkLw9MrQCi0jygp/e+vHnu6IvvRTUjC04hhUxUEk9q2Zw8H37NVz69fcedSOQVsh8nDjbZD5+w+3nP7q2u2WDGbF7MWIY0lZrgiaiyGOmpIeEGGdWvcjcsRbjVLlv97Ejfzln77HXX/2lS1ZGdocy0Uw4/8vfmd8Z+u8a1eA/8usrPnHfToD2LvjdfRc/ua4vW65rGLkX+m+65iPv+sI+1dWbhjXIsLztINkZKADQuvSl8T9dtOzCtV2DZ23DiJm9EWEgZEyvC7F/nbvi9i+8/9ulIBrylVxX18q6C3677KNbB80nO9TI3bchhciUIQZCzFYlLRKKSbZ1WbN2tZ8Y3IYaN1iaNKLmgfEj6397xAFj2z5z0UXd7770uz9avWXbJWXLcDbC7HHet66+9qo7sr/KH7ViW/DRQs2YvWpK3Z1H7zPmWzec8+5rS5EDMhnGO93na1j+b4Cksl4T0rH5Fa/eS/3Lbmw/fn23bd7cVzy6q2B2T9QmMUH1rp89ftwVFx16fG52vsUMTVIRqf/YjYtOeqm77z1bS+aoElVPGUAKgXMoOQNO+PBLRbj+bXD9PdB9XUiGAarCAA0ja7eu6xkY11DrPzWx1ss+s6r9W359/X6TDzgI7ZFGPQ30Th9b/60rzzzqdwdOmNABZDiTqeSmDcuw/PtAssNXaWxpU4uyTTsXzlS33Pq3WWu7g0O3tg/MG52i/aePkL8ctd9e1z505509t7dPVEuuvzja6fs13/7Lowe8FJh3r93aO9EYNWtjbz811FVNI0/TwEDhxZQpOerZRraz0ysMlEf3FGnqtHGpH676yw8/O+m9n82t7YvS06eNu3vaHtNv+u2n3/eXBqJeYMf228PTYlj+R4AzncspvEbU/KKFC71cbkfyoIhQOiev+n0PcWBfRGpFpG4I+ZoAjwGR3oYZp1zaOeLoj8j0ky/bNOqkL8nsMz7/cFLRzjahGk59H5b/sRIDIKcWZFp1vNHo68dudv4+hr6/c4wkk2EgU9n7LI7In/eZy+cfes5Xntzn9K/I3HMuX/Txb/9kTyDD6UzOHwbHsLyR/D90cs7tvNPE2gAAAABJRU5ErkJggg==" alt="TRITED" class="brand-img"></div>
+        <p class="brand-sub">Gestão de clientes, obras e equipamentos</p>
+      </div>
+      <button id="themeBtn" class="theme-toggle" onclick="toggleTheme()" title="Modo noturno">🌙</button>
+    </div>
+    <div class="tab-bar-wrap">
+      <div class="max-w-7xl mx-auto px-4">
+        <nav id="tabs" class="tab-bar"></nav>
+      </div>
+    </div>
+  </header>
+  <main id="view" class="max-w-7xl mx-auto px-6 py-8"></main>
+</div>
+
+<script>
+// ============ STATE ============
+const STORE_KEYS = ['clients','obras','inventory','equipment','catalog'];
+let state = { clients:[], obras:[], inventory:[], equipment:[], catalog:[] };
+let currentTab = 'painel';
+let theme = 'light';
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmt = (n) => (Number(n)||0).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-PT') : '—';
+const daysBetween = (a,b) => Math.ceil((new Date(b)-new Date(a))/(1000*60*60*24));
+const today = () => new Date().toISOString().slice(0,10);
+const currentYear = () => new Date().getFullYear();
+// Obra label: "NN-YY" (ex: 01-26 = obra 1 de 2026)
+const obraLabel = (o) => {
+  const n = String(Number(o?.numero)||0).padStart(2,'0');
+  const y = String((Number(o?.ano)||currentYear())).slice(-2);
+  return n + '-' + y;
+};
+const nextObraNumForYear = (ano) => (state.obras.filter(o=>Number(o.ano)===Number(ano)).reduce((m,o)=>Math.max(m, Number(o.numero)||0), 0)) + 1;
+
+// Payment status helpers
+function paymentStatus(obra){
+  const valor = Number(obra.valor||0);
+  const pago = Number(obra.valorPago||0);
+  if(valor === 0) return {key:'nenhum', label:'—', cls:'badge-neutral'};
+  if(pago >= valor) return {key:'pago', label:'Pago', cls:'badge-ok'};
+  if(pago > 0) return {key:'parcial', label:'Parcial', cls:'badge-partial'};
+  return {key:'pendente', label:'Por pagar', cls:'badge-warn'};
+}
+function obraEstado(obra){
+  const e = obra.estado || 'em_curso';
+  const map = {
+    em_curso: {label:'Em curso', cls:'badge-blue'},
+    aguarda_material: {label:'Aguarda material', cls:'badge-warn'},
+    espera_cliente: {label:'À espera do cliente', cls:'badge-warn'},
+    falta_termo: {label:'Falta termo de resp.', cls:'badge-warn'},
+    pronto_faturar: {label:'Pronto para faturar', cls:'badge-partial'},
+    concluida: {label:'Concluída', cls:'badge-ok'},
+    pausada: {label:'Pausada', cls:'badge-neutral'},
+    cancelada: {label:'Cancelada', cls:'badge-danger'},
+  };
+  return map[e] || map.em_curso;
+}
+
+async function loadAll(){
+  // Load theme
+  try {
+    const t = await window.storage.get('theme');
+    if(t && t.value) theme = t.value;
+  } catch(e){}
+  applyTheme();
+
+  for(const k of STORE_KEYS){
+    try {
+      const r = await window.storage.get('data:'+k);
+      if(r && r.value) state[k] = JSON.parse(r.value);
+    } catch(e){}
+  }
+
+  // MIGRATE: old pago boolean → valorPago number + add ano field + renumber per year
+  let changed = false;
+  state.obras.forEach(o => {
+    if(o.valorPago === undefined){
+      o.valorPago = o.pago ? Number(o.valor||0) : 0;
+      changed = true;
+    }
+    if(!o.estado) { o.estado = 'em_curso'; changed = true; }
+    if(o.observacoes === undefined) { o.observacoes = ''; changed = true; }
+    if(!o.equipamentosUsados) { o.equipamentosUsados = []; changed = true; }
+    if(!o.ficheiros) { o.ficheiros = {cobre:[],coaxial:[],fibra:[],fotos:[],outros:[]}; changed = true; }
+    if(o.dataConclusao === undefined) { o.dataConclusao = ''; changed = true; }
+    if(!o.ano){
+      const y = o.data ? new Date(o.data).getFullYear() : currentYear();
+      o.ano = y || currentYear();
+      o._needsRenumber = true;
+      changed = true;
+    }
+  });
+  state.equipment.forEach(eq => { if(!eq.ficheiros) { eq.ficheiros = []; changed = true; } });
+  // Renumber obras within their year (sequential, by data)
+  if(state.obras.some(o=>o._needsRenumber)){
+    const byYear = {};
+    state.obras.forEach(o => { (byYear[o.ano] = byYear[o.ano] || []).push(o); });
+    Object.values(byYear).forEach(arr => {
+      arr.sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+      arr.forEach((o,i) => { o.numero = i+1; delete o._needsRenumber; });
+    });
+  }
+  if(changed) await save('obras');
+
+  // Old keys cleanup (services/ordens from v0)
+  try {
+    const oldS = await window.storage.get('data:services');
+    if(oldS && oldS.value){
+      const services = JSON.parse(oldS.value);
+      services.forEach(s => {
+        const ano = s.dataServico ? new Date(s.dataServico).getFullYear() : currentYear();
+        state.obras.push({
+          id: s.id || uid(), numero: nextObraNumForYear(ano), ano,
+          clienteId: s.clienteId,
+          data: s.dataServico || today(), dataConclusao:'',
+          descricao: s.descricao || '', observacoes:'',
+          valor: Number(s.valor)||0, valorPago: s.pago?Number(s.valor)||0:0,
+          dataPagamento: s.dataPagamento || '', estado:'concluida',
+          incluiFichaIted:false
+        });
+      });
+      await window.storage.delete('data:services');
+      await save('obras');
+    }
+  } catch(e){}
+  try {
+    const oldO = await window.storage.get('data:ordens');
+    if(oldO && oldO.value){
+      const ordens = JSON.parse(oldO.value);
+      ordens.forEach(o => {
+        const ano = o.data ? new Date(o.data).getFullYear() : currentYear();
+        state.obras.push({
+          id: o.id || uid(), numero: nextObraNumForYear(ano), ano,
+          clienteId: o.clienteId || '',
+          data: o.data || today(), dataConclusao:'',
+          descricao: 'Ficha ITED · ' + (o.refId || ''), observacoes:'',
+          valor:0, valorPago:0, dataPagamento:'', estado:'concluida',
+          incluiFichaIted:true, refId: o.refId || '',
+          instalador: o.instalador || {nome:'',nif:'',numero:''},
+          itur: o.itur || {morada:'',codPostal:'',localidade:'',coordenadas:'',manualIted:''},
+          cabos: o.cabos || [], materiais: o.materiais || [],
+          docObrig: o.docObrig || {ensaios:false,calibracao:false,projeto:false},
+          docFacult: o.docFacult || ''
+        });
+      });
+      await window.storage.delete('data:ordens');
+      await save('obras');
+    }
+  } catch(e){}
+}
+async function save(key){
+  try { await window.storage.set('data:'+key, JSON.stringify(state[key])); }
+  catch(e){ alert('Erro ao guardar: '+e.message); }
+}
+
+// ============ THEME ============
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeBtn');
+  if(btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+async function toggleTheme(){
+  theme = theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  try { await window.storage.set('theme', theme); } catch(e){}
+}
+
+// ============ NAV ============
+const TABS = [
+  {id:'painel', label:'Painel'},
+  {id:'clientes', label:'Clientes'},
+  {id:'obras', label:'Obras'},
+  {id:'catalogo', label:'Catálogo'},
+  {id:'inventario', label:'Inventário'},
+  {id:'equipamentos', label:'Equipamentos'},
+];
+function renderTabs(){
+  const bar = document.getElementById('tabs');
+  bar.innerHTML = TABS.map(t =>
+    `<button class="nav-tab ${currentTab===t.id?'active':''}" onclick="switchTab('${t.id}')">${t.label}</button>`
+  ).join('');
+  attachTabDrag(bar);
+  // Auto-scroll active tab into view (centered)
+  requestAnimationFrame(() => {
+    const active = bar.querySelector('.nav-tab.active');
+    if(active){
+      const offset = active.offsetLeft - (bar.clientWidth/2) + (active.offsetWidth/2);
+      bar.scrollTo({left: Math.max(0, offset), behavior: 'smooth'});
+    }
+  });
+}
+
+let _dragAttached = false;
+function attachTabDrag(bar){
+  if(_dragAttached) return;
+  _dragAttached = true;
+  let isDown = false, startX, scrollLeft, moved = false;
+  bar.addEventListener('mousedown', e => {
+    isDown = true; moved = false;
+    bar.classList.add('dragging');
+    startX = e.pageX - bar.offsetLeft;
+    scrollLeft = bar.scrollLeft;
+  });
+  bar.addEventListener('mouseleave', () => { isDown = false; bar.classList.remove('dragging'); });
+  bar.addEventListener('mouseup', () => { isDown = false; bar.classList.remove('dragging'); });
+  bar.addEventListener('mousemove', e => {
+    if(!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - bar.offsetLeft;
+    const walk = (x - startX);
+    if(Math.abs(walk) > 4) moved = true;
+    bar.scrollLeft = scrollLeft - walk;
+  });
+  // Block click after drag (so dragging doesn't trigger tab switch)
+  bar.addEventListener('click', e => {
+    if(moved){ e.stopPropagation(); e.preventDefault(); moved = false; }
+  }, true);
+  // Mouse wheel = horizontal scroll
+  bar.addEventListener('wheel', e => {
+    if(e.deltaY !== 0){
+      e.preventDefault();
+      bar.scrollLeft += e.deltaY;
+    }
+  }, {passive: false});
+}
+function switchTab(id){ currentTab=id; renderTabs(); renderView(); }
+
+function renderView(){
+  const v = document.getElementById('view');
+  if(currentTab==='painel') v.innerHTML = viewPainel();
+  else if(currentTab==='clientes') v.innerHTML = viewClientes();
+  else if(currentTab==='obras') v.innerHTML = viewObras();
+  else if(currentTab==='catalogo') v.innerHTML = viewCatalogo();
+  else if(currentTab==='inventario') v.innerHTML = viewInventario();
+  else if(currentTab==='equipamentos') v.innerHTML = viewEquipamentos();
+}
+
+// ============ HELPERS ============
+function clientStatus(clienteId){
+  const obras = state.obras.filter(o => o.clienteId === clienteId);
+  let divida = 0, pago = 0, pendCount = 0, parcCount = 0, pagasCount = 0;
+  obras.forEach(o => {
+    const val = Number(o.valor||0);
+    const vp = Number(o.valorPago||0);
+    pago += vp;
+    divida += Math.max(0, val - vp);
+    const st = paymentStatus(o).key;
+    if(st === 'pendente') pendCount++;
+    else if(st === 'parcial') parcCount++;
+    else if(st === 'pago') pagasCount++;
+  });
+  const emDia = pendCount === 0 && parcCount === 0;
+  return { obras, divida, pago, pendCount, parcCount, pagasCount, emDia, total: obras.length };
+}
+
+// ============ PAINEL ============
+function viewPainel(){
+  let totalDivida = 0, totalRecebido = 0;
+  state.obras.forEach(o => {
+    const v = Number(o.valor||0), p = Number(o.valorPago||0);
+    totalRecebido += p;
+    totalDivida += Math.max(0, v - p);
+  });
+
+  const clientesAtraso = state.clients
+    .map(c => ({c, st: clientStatus(c.id)}))
+    .filter(x => !x.st.emDia && x.st.total > 0)
+    .sort((a,b) => b.st.divida - a.st.divida);
+
+  const alertLicencas = [];
+  state.equipment.forEach(eq => (eq.licencas||[]).forEach(l => {
+    if(!l.dataFim) return;
+    const d = daysBetween(today(), l.dataFim);
+    if(d <= 30) alertLicencas.push({eq, lic:l, dias:d});
+  }));
+  alertLicencas.sort((a,b)=>a.dias-b.dias);
+
+  const ESTADOS_ABERTOS = ['em_curso','pausada','aguarda_material','espera_cliente','falta_termo','pronto_faturar'];
+  const obrasRecentes = [...state.obras]
+    .filter(o => ESTADOS_ABERTOS.includes(o.estado||'em_curso'))
+    .sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+    .slice(0,8);
+
+  return `
+  <div class="grid-4 mb-8">
+    <div class="card p-5">
+      <div class="label">Total Clientes</div>
+      <div class="stat-num stat-blue">${state.clients.length}</div>
+      <div class="text-xs mt-1" style="color:var(--muted);">${clientesAtraso.length} em atraso</div>
+    </div>
+    <div class="card p-5" style="cursor:pointer;" onclick="setObrasFilter('abertas');switchTab('obras');">
+      <div class="label">Obras em Aberto</div>
+      <div class="stat-num stat-accent">${state.obras.filter(o => ESTADOS_ABERTOS.includes(o.estado||'em_curso')).length}</div>
+      <div class="text-xs mt-1" style="color:var(--muted);">${state.obras.filter(o=>o.estado==='concluida').length} concluída(s) · ${state.obras.length} total</div>
+    </div>
+    <div class="card p-5">
+      <div class="label">Por Receber</div>
+      <div class="stat-num stat-accent">${fmt(totalDivida)}</div>
+      <div class="text-xs mt-1" style="color:var(--muted);">valor em dívida</div>
+    </div>
+    <div class="card p-5">
+      <div class="label">Já Recebido</div>
+      <div class="stat-num stat-ok">${fmt(totalRecebido)}</div>
+      <div class="text-xs mt-1" style="color:var(--muted);">valor cobrado</div>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-6">
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold">Clientes com Pagamentos em Atraso</h2>
+        <span class="badge ${clientesAtraso.length?'badge-warn':'badge-ok'}">${clientesAtraso.length}</span>
+      </div>
+      ${clientesAtraso.length === 0
+        ? `<div class="empty"><div class="empty-icon">✓</div>Todos os clientes em dia</div>`
+        : clientesAtraso.slice(0,8).map(x => `
+            <div class="py-3 border-b flex items-center justify-between gap-3 cursor-pointer" style="border-color:var(--line);" onclick="openCliente('${x.c.id}')">
+              <div>
+                <div class="font-semibold">${escapeHtml(x.c.nome)}</div>
+                <div class="text-xs mt-0.5" style="color:var(--muted);">
+                  ${x.st.pendCount?x.st.pendCount+' pendente(s)':''}${x.st.pendCount&&x.st.parcCount?' · ':''}${x.st.parcCount?x.st.parcCount+' parcial(is)':''}
+                </div>
+              </div>
+              <div class="font-semibold" style="color:var(--accent);">${fmt(x.st.divida)}</div>
+            </div>
+          `).join('')
+      }
+    </div>
+
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold">Alertas de Licenças</h2>
+        <span class="badge ${alertLicencas.length?'badge-warn':'badge-ok'}">${alertLicencas.length}</span>
+      </div>
+      ${alertLicencas.length === 0
+        ? `<div class="empty"><div class="empty-icon">✓</div>Nenhuma licença a expirar nos próximos 30 dias</div>`
+        : alertLicencas.slice(0,8).map(a => {
+            const cls = a.dias < 0 ? 'badge-danger' : (a.dias <= 7 ? 'badge-danger' : 'badge-warn');
+            const txt = a.dias < 0 ? `há ${Math.abs(a.dias)}d` : (a.dias===0?'hoje':`${a.dias}d`);
+            return `<div class="py-3 border-b" style="border-color:var(--line);">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="font-semibold">${escapeHtml(a.eq.nome)}</div>
+                  <div class="text-xs" style="color:var(--muted);">${escapeHtml(a.lic.nome)} · ${fmtDate(a.lic.dataFim)}</div>
+                </div>
+                <span class="badge ${cls}">${txt}</span>
+              </div>
+            </div>`;
+          }).join('')
+      }
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold">🔨 Obras em Aberto</h2>
+      <button class="btn btn-ghost" onclick="setObrasFilter('abertas');switchTab('obras');">Ver todas →</button>
+    </div>
+    ${(() => {
+      const prontas = state.obras.filter(o => o.estado === 'pronto_faturar');
+      return prontas.length > 0 ? `
+        <div style="background:var(--partial-soft);border:1px solid var(--partial);border-radius:11px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div>
+            <strong style="color:var(--partial);">💶 ${prontas.length} obra(s) pronta(s) para faturar</strong>
+            <div class="text-xs mt-1" style="color:var(--ink-soft);">Total a faturar: <strong>${fmt(prontas.reduce((a,o)=>a+Number(o.valor||0),0))}</strong></div>
+          </div>
+          <button class="btn btn-ghost" onclick="setObrasFilter('pronto_faturar');switchTab('obras');">Ver →</button>
+        </div>
+      ` : '';
+    })()}
+    ${obrasRecentes.length === 0
+      ? `<div class="empty"><div class="empty-icon">✓</div>Nenhuma obra em aberto. Tudo concluído!</div>`
+      : `<table><thead><tr><th>Nº</th><th>Data</th><th>Descrição</th><th>Valor</th><th>Estado</th><th>Pagamento</th></tr></thead><tbody>${
+          obrasRecentes.map(o => {
+            const pay = paymentStatus(o);
+            const est = obraEstado(o);
+            return `<tr class="clickable" onclick="openObra('${o.id}')">
+              <td class="obra-num">${obraLabel(o)}</td>
+              <td>${fmtDate(o.data)}</td>
+              <td>${escapeHtml((o.descricao||'').slice(0,60))}</td>
+              <td class="font-semibold">${fmt(o.valor)}</td>
+              <td><span class="badge ${est.cls}">${est.label}</span></td>
+              <td><span class="badge ${pay.cls}">${pay.label}</span></td>
+            </tr>`;
+          }).join('')
+        }</tbody></table>`
+    }
+  </div>`;
+}
+
+// ============ CLIENTES (LISTA) ============
+function viewClientes(){
+  return `
+  <div class="flex items-center justify-between mb-6">
+    <div><h2 class="text-2xl font-bold">Clientes</h2><p class="text-sm" style="color:var(--muted);">${state.clients.length} cliente(s)</p></div>
+    <button class="btn btn-accent" onclick="editCliente()">+ Novo Cliente</button>
+  </div>
+  ${state.clients.length===0
+    ? `<div class="card empty"><div class="empty-icon">👥</div>Sem clientes. Clique em "Novo Cliente" para começar.</div>`
+    : `<div class="card"><table><thead><tr><th>Nome</th><th>NIF</th><th>Contacto</th><th>Obras</th><th>Estado</th><th>Por Receber</th><th></th></tr></thead><tbody>${
+        state.clients.map(c => {
+          const st = clientStatus(c.id);
+          const estadoBadge = st.total === 0 ? '<span class="badge badge-neutral">sem obras</span>'
+            : (st.emDia ? '<span class="badge badge-ok">Em dia</span>' : `<span class="badge badge-warn">${st.pendCount+st.parcCount} pendente(s)</span>`);
+          return `<tr class="clickable" onclick="openCliente('${c.id}')">
+            <td class="font-semibold">${escapeHtml(c.nome)}</td>
+            <td>${escapeHtml(c.nif||'—')}</td>
+            <td>${escapeHtml(c.contacto||'—')}</td>
+            <td>${st.total}</td>
+            <td>${estadoBadge}</td>
+            <td><span class="${st.divida>0?'font-semibold':''}" style="${st.divida>0?'color:var(--accent);':''}">${fmt(st.divida)}</span></td>
+            <td class="text-right"><button class="btn btn-danger" onclick="event.stopPropagation();deleteCliente('${c.id}')" title="Eliminar">🗑</button></td>
+          </tr>`;
+        }).join('')
+      }</tbody></table></div>`
+  }`;
+}
+
+function editCliente(id){
+  const c = id ? state.clients.find(x=>x.id===id) : {nome:'',nif:'',morada:'',codPostal:'',localidade:'',contacto:'',email:'',notas:''};
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${id?'Editar':'Novo'} Cliente</h2>
+      <div class="grid-2">
+        <div><label class="label">Nome *</label><input class="input" id="f-nome" value="${escapeAttr(c.nome)}"></div>
+        <div><label class="label">NIF</label><input class="input" id="f-nif" value="${escapeAttr(c.nif||'')}"></div>
+        <div><label class="label">Contacto</label><input class="input" id="f-contacto" value="${escapeAttr(c.contacto||'')}"></div>
+        <div><label class="label">Email</label><input class="input" id="f-email" value="${escapeAttr(c.email||'')}"></div>
+        <div><label class="label">Morada</label><input class="input" id="f-morada" value="${escapeAttr(c.morada||'')}"></div>
+        <div><label class="label">Cód. Postal</label><input class="input" id="f-cp" value="${escapeAttr(c.codPostal||'')}"></div>
+        <div><label class="label">Localidade</label><input class="input" id="f-loc" value="${escapeAttr(c.localidade||'')}"></div>
+      </div>
+      <div class="mt-3"><label class="label">Notas</label><textarea class="input" id="f-notas" rows="3">${escapeHtml(c.notas||'')}</textarea></div>
+      <div class="flex justify-between mt-6">
+        ${id?`<button class="btn btn-danger" onclick="deleteCliente('${id}')">Eliminar</button>`:'<div></div>'}
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="${id?`openCliente('${id}')`:'closeModal()'}">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveCliente('${id||''}')">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+async function saveCliente(id){
+  const data = {
+    nome: document.getElementById('f-nome').value.trim(),
+    nif: document.getElementById('f-nif').value.trim(),
+    morada: document.getElementById('f-morada').value.trim(),
+    codPostal: document.getElementById('f-cp').value.trim(),
+    localidade: document.getElementById('f-loc').value.trim(),
+    contacto: document.getElementById('f-contacto').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    notas: document.getElementById('f-notas').value.trim(),
+  };
+  if(!data.nome){ alert('Nome é obrigatório'); return; }
+  let finalId = id;
+  if(id){
+    const i = state.clients.findIndex(c=>c.id===id);
+    state.clients[i] = {...state.clients[i], ...data};
+  } else {
+    finalId = uid();
+    state.clients.push({id:finalId, ...data});
+  }
+  await save('clients');
+  openCliente(finalId);
+}
+function deleteCliente(id){
+  confirmAction('Eliminar cliente? As obras ficarão sem cliente associado, mas não serão removidas.', async () => {
+    state.clients = state.clients.filter(c=>c.id!==id);
+    // Disassociate obras instead of deleting them (obras now live independently)
+    state.obras.forEach(o => { if(o.clienteId === id) o.clienteId = ''; });
+    await save('clients'); await save('obras');
+    closeModal(); currentTab='clientes'; renderTabs(); renderView();
+  });
+}
+
+// ============ FICHA DO CLIENTE ============
+function openCliente(id){
+  const c = state.clients.find(x=>x.id===id); if(!c) return;
+  const st = clientStatus(id);
+  const obrasOrdered = [...st.obras].sort((a,b)=>(Number(b.numero)||0)-(Number(a.numero)||0));
+  const statusHeader = st.total === 0
+    ? '<span class="badge badge-neutral">Sem obras</span>'
+    : (st.emDia
+        ? '<span class="badge badge-ok">✓ Pagamentos em dia</span>'
+        : `<span class="badge badge-warn">⚠ Pagamentos em atraso</span>`);
+
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-start justify-between gap-3 mb-5">
+        <div class="flex-1">
+          <div class="flex items-center gap-3 flex-wrap mb-2">
+            <h2 class="text-2xl font-bold">${escapeHtml(c.nome)}</h2>
+            ${statusHeader}
+          </div>
+          <div class="grid-2 text-sm" style="color:var(--ink-soft);">
+            <div>${c.contacto?'<strong>Tel.</strong> '+escapeHtml(c.contacto):'<em style="color:var(--muted);">sem contacto</em>'}</div>
+            <div>${c.email?'<strong>Email</strong> '+escapeHtml(c.email):''}</div>
+            <div>${c.nif?'<strong>NIF</strong> '+escapeHtml(c.nif):''}</div>
+            <div>${(c.morada||c.codPostal||c.localidade)?'<strong>Morada</strong> '+escapeHtml((c.morada||'')+' '+(c.codPostal||'')+' '+(c.localidade||'')):''}</div>
+          </div>
+          ${c.notas?`<div class="text-sm mt-3 italic p-2 rounded" style="color:var(--ink-soft);background:var(--line-soft);">"${escapeHtml(c.notas)}"</div>`:''}
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="editCliente('${id}')">Editar</button>
+          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+
+      <div class="grid-4 mb-5">
+        <div class="card p-4"><div class="label">Obras</div><div class="stat-num" style="font-size:28px;">${st.total}</div></div>
+        <div class="card p-4"><div class="label">Pagas</div><div class="stat-num stat-ok" style="font-size:28px;">${st.pagasCount}</div></div>
+        <div class="card p-4"><div class="label">Por Receber</div><div class="stat-num stat-accent" style="font-size:22px;">${fmt(st.divida)}</div></div>
+        <div class="card p-4"><div class="label">Recebido</div><div class="stat-num stat-ok" style="font-size:22px;">${fmt(st.pago)}</div></div>
+      </div>
+
+      ${st.total > 0 ? `
+        <div class="flex gap-2 mb-4 flex-wrap text-sm">
+          <span class="chip"><strong style="color:var(--ok);">${st.pagasCount}</strong> paga(s)</span>
+          <span class="chip"><strong style="color:var(--partial);">${st.parcCount}</strong> parcial(is)</span>
+          <span class="chip"><strong style="color:var(--warn);">${st.pendCount}</strong> pendente(s)</span>
+        </div>
+      ` : ''}
+
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-bold">Obras do Cliente</h3>
+        <button class="btn btn-accent" onclick="editObra(null,'${id}')">+ Nova Obra</button>
+      </div>
+      ${obrasOrdered.length===0 ? `<div class="empty"><div class="empty-icon">🔨</div>Sem obras. Clique em "Nova Obra" para criar a primeira.</div>` :
+        `<table><thead><tr><th>Nº</th><th>Data</th><th>Descrição</th><th>Valor</th><th>Estado</th><th>Pagamento</th></tr></thead><tbody>${
+          obrasOrdered.map(o=>{
+            const pay = paymentStatus(o);
+            const est = obraEstado(o);
+            const payExtra = pay.key==='parcial'?`<div class="text-xs mt-0.5" style="color:var(--muted);">${fmt(o.valorPago)} / ${fmt(o.valor)}</div>`:'';
+            return `<tr class="clickable" onclick="openObra('${o.id}')">
+              <td class="obra-num">${obraLabel(o)}</td>
+              <td>${fmtDate(o.data)}</td>
+              <td>${escapeHtml((o.descricao||'').slice(0,60))}${o.incluiFichaIted?' <span class="badge badge-blue">ITED</span>':''}</td>
+              <td class="font-semibold">${fmt(o.valor)}</td>
+              <td><span class="badge ${est.cls}">${est.label}</span></td>
+              <td><span class="badge ${pay.cls}">${pay.label}</span>${payExtra}</td>
+            </tr>`;
+          }).join('')
+        }</tbody></table>`
+      }
+    </div>
+  `);
+}
+
+// ============ FICHA DA OBRA ============
+function openObra(id){
+  const o = state.obras.find(x=>x.id===id); if(!o) return;
+  const c = o.clienteId ? state.clients.find(x=>x.id===o.clienteId) : null;
+  const pay = paymentStatus(o);
+  const est = obraEstado(o);
+  const valor = Number(o.valor||0);
+  const valorPago = Number(o.valorPago||0);
+  const emFalta = Math.max(0, valor - valorPago);
+  const progressPct = valor > 0 ? Math.min(100, (valorPago/valor)*100) : 0;
+
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-start justify-between gap-3 mb-5">
+        <div>
+          <div class="flex items-center gap-3 flex-wrap mb-1">
+            <h2 class="text-3xl font-bold"><span class="obra-num">Obra ${obraLabel(o)}</span></h2>
+            <span class="badge ${est.cls}">${est.label}</span>
+            <span class="badge ${pay.cls}">${pay.label}</span>
+            ${o.incluiFichaIted?'<span class="badge badge-blue">Ficha ITED</span>':''}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          ${pay.key !== 'pago' && valor > 0?`<button class="btn btn-ok" onclick="registarPagamento('${o.id}')">€ Registar Pagamento</button>`:''}
+          ${o.estado !== 'concluida' ? `<button class="btn btn-ok" onclick="setObraEstado('${o.id}','concluida')" title="Marcar como concluída">✓ Concluir</button>` : `<button class="btn btn-ghost" onclick="setObraEstado('${o.id}','em_curso')" title="Reabrir obra">↻ Reabrir</button>`}
+          <button class="btn btn-accent" onclick="exportObraZIP('${o.id}')">📦 Exportar ZIP</button>
+          <button class="btn btn-ghost" onclick="editObra('${o.id}')">Editar</button>
+          <button class="btn btn-danger" onclick="deleteObra('${o.id}')">Eliminar</button>
+          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-4 flex items-center justify-between gap-3" style="background:var(--bg-alt);">
+        <div>
+          <div class="label">Cliente Associado</div>
+          ${c
+            ? `<div class="font-semibold mt-1" style="font-size:17px;cursor:pointer;color:var(--blue);" onclick="openCliente('${c.id}')">👤 ${escapeHtml(c.nome)}</div>`
+            : `<div class="font-semibold mt-1" style="font-size:15px;color:var(--muted);">— sem cliente associado —</div>`
+          }
+        </div>
+        <button class="btn ${c?'btn-ghost':'btn-accent'}" onclick="pickClienteForObra('${o.id}')">${c?'Mudar cliente':'+ Associar cliente'}</button>
+      </div>
+
+      <div class="grid-3 mb-4">
+        <div class="card p-4">
+          <div class="label">Data de Início</div>
+          <div class="font-semibold mt-1" style="font-size:17px;">${fmtDate(o.data)}</div>
+        </div>
+        <div class="card p-4">
+          <div class="label">Data de Conclusão</div>
+          <div class="font-semibold mt-1" style="font-size:17px;">${fmtDate(o.dataConclusao)}</div>
+        </div>
+        <div class="card p-4">
+          <div class="label">Último Pagamento</div>
+          <div class="font-semibold mt-1" style="font-size:17px;">${fmtDate(o.dataPagamento)}</div>
+        </div>
+      </div>
+
+      <div class="card p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="label" style="margin:0;">Valor Total</div>
+          <div class="stat-num" style="font-size:30px;">${fmt(valor)}</div>
+        </div>
+        ${valor > 0 ? `
+          <div class="progress mb-3"><div class="progress-bar" style="width:${progressPct}%"></div></div>
+          <div class="flex items-center justify-between text-sm">
+            <div><span style="color:var(--muted);">Recebido:</span> <strong style="color:var(--ok);">${fmt(valorPago)}</strong></div>
+            <div><span style="color:var(--muted);">Em falta:</span> <strong style="color:var(--accent);">${fmt(emFalta)}</strong></div>
+          </div>
+        ` : '<div class="text-sm" style="color:var(--muted);">Sem valor definido</div>'}
+      </div>
+
+      <div class="section-box mb-4">
+        <div class="label">Descrição do Trabalho Realizado</div>
+        <div style="white-space:pre-wrap;margin-top:8px;line-height:1.6;">${escapeHtml(o.descricao||'—')}</div>
+      </div>
+
+      ${o.observacoes ? `
+        <div class="section-box mb-4">
+          <div class="label">Observações</div>
+          <div style="white-space:pre-wrap;margin-top:8px;line-height:1.6;">${escapeHtml(o.observacoes)}</div>
+        </div>
+      ` : ''}
+
+      ${o.incluiFichaIted ? `
+        <div class="flex items-center justify-between mt-6 pt-4" style="border-top:1px solid var(--line);">
+          <div>
+            <div class="font-semibold">Ficha ITED associada</div>
+            <div class="text-xs" style="color:var(--muted);">Ref. ID: ${escapeHtml(o.refId||'—')}</div>
+          </div>
+          <button class="btn btn-primary" onclick="previewObraPDF('${o.id}')">↓ Ver / Exportar PDF</button>
+        </div>
+      ` : ''}
+    </div>
+  `);
+}
+
+// ============ REGISTAR PAGAMENTO (parcial ou total) ============
+async function setObraEstado(id, novoEstado){
+  const o = state.obras.find(x=>x.id===id);
+  if(!o) return;
+  o.estado = novoEstado;
+  if(novoEstado === 'concluida' && !o.dataConclusao){
+    o.dataConclusao = today();
+  }
+  await save('obras');
+  openObra(id);
+}
+
+function registarPagamento(id){
+  const o = state.obras.find(x=>x.id===id);
+  const emFalta = Math.max(0, Number(o.valor||0) - Number(o.valorPago||0));
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-2">Registar Pagamento</h2>
+      <p class="text-sm mb-5" style="color:var(--muted);">Obra <span class="obra-num">${obraLabel(o)}</span></p>
+
+      <div class="grid-3 mb-4">
+        <div class="card p-3"><div class="label">Valor Total</div><div class="font-semibold text-lg">${fmt(o.valor)}</div></div>
+        <div class="card p-3"><div class="label">Já Pago</div><div class="font-semibold text-lg" style="color:var(--ok);">${fmt(o.valorPago)}</div></div>
+        <div class="card p-3"><div class="label">Em Falta</div><div class="font-semibold text-lg" style="color:var(--accent);">${fmt(emFalta)}</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div><label class="label">Valor a pagar agora (€)</label><input class="input" type="number" step="0.01" id="p-valor" value="${emFalta.toFixed(2)}" max="${emFalta}"></div>
+        <div><label class="label">Data do pagamento</label><input class="input" type="date" id="p-data" value="${today()}"></div>
+      </div>
+
+      <div class="flex gap-2 mt-3">
+        <button class="btn btn-ghost" onclick="document.getElementById('p-valor').value='${emFalta.toFixed(2)}'">Pagar tudo</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('p-valor').value='${(emFalta/2).toFixed(2)}'">Metade</button>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-ghost" onclick="openObra('${id}')">Cancelar</button>
+        <button class="btn btn-ok" onclick="confirmarPagamento('${id}')">Confirmar</button>
+      </div>
+    </div>
+  `);
+}
+async function confirmarPagamento(id){
+  const o = state.obras.find(x=>x.id===id);
+  const v = parseFloat(document.getElementById('p-valor').value)||0;
+  const d = document.getElementById('p-data').value || today();
+  if(v <= 0){ alert('Valor inválido'); return; }
+  o.valorPago = Math.min(Number(o.valor||0), Number(o.valorPago||0) + v);
+  o.dataPagamento = d;
+  await save('obras');
+  openObra(id);
+}
+
+// ============ ASSOCIAR CLIENTE A OBRA ============
+function pickClienteForObra(obraId){
+  const o = state.obras.find(x=>x.id===obraId); if(!o) return;
+  const list = state.clients.length === 0
+    ? `<div class="empty"><div class="empty-icon">👥</div>Sem clientes. Crie um cliente primeiro no separador "Clientes".</div>`
+    : state.clients.map(c => {
+        const isCurrent = o.clienteId === c.id;
+        return `
+          <div class="card p-3 mb-2 cursor-pointer flex items-center justify-between" onclick="associateClienteToObra('${obraId}','${c.id}')" style="${isCurrent?'border-color:var(--accent);':''}">
+            <div>
+              <div class="font-semibold">${escapeHtml(c.nome)}</div>
+              <div class="text-xs mt-1" style="color:var(--muted);">${c.nif?'NIF '+escapeHtml(c.nif):''}${c.contacto?' · '+escapeHtml(c.contacto):''}</div>
+            </div>
+            ${isCurrent?'<span class="badge badge-ok">Atual</span>':'<span style="color:var(--muted);">→</span>'}
+          </div>`;
+      }).join('');
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-2xl font-bold">Associar Cliente</h2>
+          <p class="text-sm" style="color:var(--muted);">Obra <span class="obra-num">${obraLabel(o)}</span></p>
+        </div>
+        <button class="icon-btn text-xl" onclick="openObra('${obraId}')">✕</button>
+      </div>
+      <input class="input mb-4" id="cli-filter" placeholder="Filtrar por nome, NIF ou contacto..." oninput="filterClientPicker(this.value)">
+      <div id="cli-picker-list">${list}</div>
+      ${o.clienteId?`<div class="mt-4 text-center"><button class="btn btn-danger" onclick="associateClienteToObra('${obraId}','')">Remover associação ao cliente</button></div>`:''}
+    </div>
+  `);
+}
+function filterClientPicker(q){
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('#cli-picker-list .card').forEach(el => {
+    el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+async function associateClienteToObra(obraId, clienteId){
+  const o = state.obras.find(x=>x.id===obraId);
+  o.clienteId = clienteId || '';
+  await save('obras');
+  openObra(obraId);
+}
+
+// ============ EDITAR OBRA ============
+function editObra(id, preClienteId){
+  if(id){
+    window._editingObra = JSON.parse(JSON.stringify(state.obras.find(x=>x.id===id)));
+    window._editingObraId = id;
+  } else {
+    window._editingObra = {
+      numero: nextObraNumForYear(currentYear()),
+      ano: currentYear(),
+      clienteId: preClienteId || '',
+      data: today(),
+      dataConclusao: '',
+      descricao: '',
+      observacoes: '',
+      valor: 0,
+      valorPago: 0,
+      dataPagamento: '',
+      estado: 'em_curso',
+      incluiFichaIted: false,
+      refId: '',
+      instalador: {nome:'',nif:'',numero:''},
+      itur: {morada:'',codPostal:'',localidade:'',coordenadas:'',manualIted:''},
+      cabos: [{tecnologia:'Pares de Cobre',marca:'',classe:'',ref:''},{tecnologia:'Coaxial',marca:'',classe:'',ref:''},{tecnologia:'Fibra Ótica',marca:'',classe:'',ref:''}],
+      materiais: [
+        {designacao:'Tomadas',marca:'',ref:''},
+        {designacao:'ATE (RG)',marca:'',ref:''},
+        {designacao:'ATI (RC)',marca:'',ref:''},
+        {designacao:'Redes S/MATV',marca:'',ref:''},
+        {designacao:'Redes CATV',marca:'',ref:''},
+        {designacao:'CVM/CAM',marca:'',ref:''},
+        {designacao:'Cabeça de Rede',marca:'',ref:''},
+        {designacao:'Outros',marca:'',ref:''},
+      ],
+      docObrig: {ensaios:false,calibracao:false,projeto:false},
+      docFacult: '',
+      equipamentosUsados: [],
+      ficheiros: { cobre:[], coaxial:[], fibra:[], fotos:[], outros:[] }
+    };
+    window._editingObraId = null;
+  }
+  _renderObraModal();
+}
+
+function _renderObraModal(){
+  const o = window._editingObra;
+  const id = window._editingObraId;
+  const estadoOpts = [
+    ['em_curso','🔨 Em curso'],
+    ['aguarda_material','📦 Aguarda material'],
+    ['espera_cliente','⏳ À espera do cliente'],
+    ['falta_termo','📝 Falta termo de responsabilidade'],
+    ['pronto_faturar','💶 Pronto para faturar'],
+    ['concluida','✓ Concluída'],
+    ['pausada','⏸ Pausada'],
+    ['cancelada','✕ Cancelada']
+  ].map(([v,l])=>`<option value="${v}" ${o.estado===v?'selected':''}>${l}</option>`).join('');
+
+  const itedSection = o.incluiFichaIted ? `
+    <h3 class="serif text-lg font-bold mt-6 mb-3">Ficha ITED</h3>
+    <div class="section-box">
+      <div class="grid-3">
+        <div><label class="label">Ref. ID</label><input class="input" id="o-refid" value="${escapeAttr(o.refId||'')}"></div>
+      </div>
+      <h4 class="serif font-bold mt-4 mb-2">Instalador</h4>
+      <div class="grid-3">
+        <div><label class="label">Nome</label><input class="input" id="o-inst-nome" value="${escapeAttr(o.instalador.nome)}"></div>
+        <div><label class="label">NIF</label><input class="input" id="o-inst-nif" value="${escapeAttr(o.instalador.nif)}"></div>
+        <div><label class="label">Nº (ANACOM, OE, OET)</label><input class="input" id="o-inst-num" value="${escapeAttr(o.instalador.numero)}"></div>
+      </div>
+      <h4 class="serif font-bold mt-4 mb-2">ITUR</h4>
+      <div class="grid-2">
+        <div><label class="label">Morada</label><input class="input" id="o-itur-morada" value="${escapeAttr(o.itur.morada)}"></div>
+        <div><label class="label">Código Postal</label><input class="input" id="o-itur-cp" value="${escapeAttr(o.itur.codPostal)}"></div>
+        <div><label class="label">Localidade</label><input class="input" id="o-itur-loc" value="${escapeAttr(o.itur.localidade)}"></div>
+        <div><label class="label">Coordenadas Geográficas</label><input class="input" id="o-itur-coord" value="${escapeAttr(o.itur.coordenadas)}"></div>
+      </div>
+      <div class="mt-3"><label class="label">Manual ITED Aplicável</label><input class="input" id="o-itur-manual" value="${escapeAttr(o.itur.manualIted)}" placeholder="ex: 2ª Edição, 3ª Edição"></div>
+
+      <h4 class="serif font-bold mt-4 mb-2">Cabos Instalados</h4>
+      <div class="text-xs mb-2" style="color:var(--muted);">⭐ Já no catálogo · ✨ Novo · ⚠ Difere do catálogo (será atualizado ao guardar)</div>
+      ${(o.cabos||[]).map((cab,i)=>{
+        const status = catalogRowStatus(cab, 'cabo');
+        return `
+        <div class="mb-2 items-end" style="display:grid;grid-template-columns:1fr 1.2fr 0.9fr 0.8fr auto auto auto;gap:8px;">
+          <input class="input" placeholder="Tecnologia" data-c="tec" data-i="${i}" value="${escapeAttr(cab.tecnologia)}">
+          <input class="input" placeholder="Marca e Modelo" data-c="marca" data-i="${i}" value="${escapeAttr(cab.marca||'')}">
+          <input class="input" placeholder="Referência" data-c="ref" data-i="${i}" value="${escapeAttr(cab.ref||'')}">
+          <input class="input" placeholder="Classe RPC" data-c="classe" data-i="${i}" value="${escapeAttr(cab.classe||'')}">
+          <span title="${status.title}" style="display:flex;align-items:center;justify-content:center;font-size:18px;width:36px;height:36px;">${status.icon}</span>
+          <button class="btn btn-ghost" onclick="pickFromCatalog('cabo',${i})" title="Buscar no catálogo">📖</button>
+          <button class="btn btn-danger" onclick="removeCabo(${i})">✕</button>
+        </div>
+      `;}).join('')}
+      <button class="btn btn-ghost" onclick="addCabo()">+ Adicionar cabo</button>
+
+      <h4 class="serif font-bold mt-4 mb-2">Outros Materiais e Dispositivos</h4>
+      ${(o.materiais||[]).map((m,i)=>{
+        const status = catalogRowStatus(m, 'material');
+        return `
+        <div class="mb-2 items-end" style="display:grid;grid-template-columns:1fr 1.2fr 0.9fr auto auto auto;gap:8px;">
+          <input class="input" placeholder="Designação" data-m="des" data-i="${i}" value="${escapeAttr(m.designacao||'')}">
+          <input class="input" placeholder="Marca e Modelo" data-m="marca" data-i="${i}" value="${escapeAttr(m.marca||'')}">
+          <input class="input" placeholder="Referência" data-m="ref" data-i="${i}" value="${escapeAttr(m.ref||'')}">
+          <span title="${status.title}" style="display:flex;align-items:center;justify-content:center;font-size:18px;width:36px;height:36px;">${status.icon}</span>
+          <button class="btn btn-ghost" onclick="pickFromCatalog('material',${i})" title="Buscar no catálogo">📖</button>
+          <button class="btn btn-danger" onclick="removeMat(${i})">✕</button>
+        </div>
+      `;}).join('')}
+      <button class="btn btn-ghost" onclick="addMat()">+ Adicionar material</button>
+
+      <h4 class="serif font-bold mt-4 mb-2">Documentação Obrigatória</h4>
+      <div class="space-y-2">
+        <label class="flex items-center gap-2"><input type="checkbox" id="o-doc-ensaios" ${o.docObrig.ensaios?'checked':''}> Resultados dos ensaios com indicação da data e do técnico</label>
+        <label class="flex items-center gap-2"><input type="checkbox" id="o-doc-calibracao" ${o.docObrig.calibracao?'checked':''}> Cópia dos certificados de calibração dos equipamentos</label>
+        <label class="flex items-center gap-2"><input type="checkbox" id="o-doc-projeto" ${o.docObrig.projeto?'checked':''}> Cópia do projeto</label>
+      </div>
+
+      <h4 class="serif font-bold mt-4 mb-2">Documentação Facultativa</h4>
+      <textarea class="input" id="o-doc-facult" rows="2">${escapeHtml(o.docFacult||'')}</textarea>
+    </div>
+  ` : '';
+
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${id?'Editar':'Nova'} Obra <span class="obra-num">${obraLabel(o)}</span></h2>
+
+      <div class="grid-4">
+        <div><label class="label">Nº Obra</label><input class="input" type="number" id="o-numero" value="${o.numero}"></div>
+        <div><label class="label">Ano</label><input class="input" type="number" id="o-ano" value="${o.ano||currentYear()}" min="2000" max="2099"></div>
+        <div><label class="label">Data de Início</label><input class="input" type="date" id="o-data" value="${o.data}"></div>
+        <div><label class="label">Data de Conclusão</label><input class="input" type="date" id="o-dataconc" value="${o.dataConclusao||''}"></div>
+      </div>
+
+      <div class="grid-2 mt-3">
+        <div><label class="label">Estado da Obra</label><select class="select" id="o-estado">${estadoOpts}</select></div>
+        <div><label class="label">Valor Total (€)</label><input class="input" type="number" step="0.01" id="o-valor" value="${o.valor||0}"></div>
+      </div>
+
+      <div class="mt-3"><label class="label">Descrição do Trabalho Realizado *</label><textarea class="input" id="o-desc" rows="4" placeholder="O que foi feito nesta obra...">${escapeHtml(o.descricao||'')}</textarea></div>
+
+      <div class="mt-3"><label class="label">Observações</label><textarea class="input" id="o-obs" rows="2" placeholder="Notas internas, detalhes adicionais...">${escapeHtml(o.observacoes||'')}</textarea></div>
+
+      <div class="grid-2 mt-3">
+        <div><label class="label">Valor Já Pago (€)</label><input class="input" type="number" step="0.01" id="o-valorpago" value="${o.valorPago||0}"></div>
+        <div><label class="label">Data do Pagamento</label><input class="input" type="date" id="o-datapago" value="${o.dataPagamento||''}"></div>
+      </div>
+      <div class="text-xs mt-1" style="color:var(--muted);">Dica: pode registar pagamentos parciais. Para pagamentos adicionais mais tarde, use o botão "Registar Pagamento" na ficha da obra.</div>
+
+      <div class="mt-5">
+        <label class="flex items-center gap-2 cursor-pointer font-semibold">
+          <input type="checkbox" id="o-incluiIted" ${o.incluiFichaIted?'checked':''} onchange="toggleItedSection(this.checked)">
+          Incluir Ficha ITED nesta obra
+        </label>
+        <div class="text-xs mt-1" style="color:var(--muted);">Ative para preencher o formulário ITED e poder exportar PDF.</div>
+      </div>
+
+      ${itedSection}
+
+      <h3 class="serif text-lg font-bold mt-6 mb-3">🔧 Equipamentos Utilizados</h3>
+      <div class="section-box">
+        ${(o.equipamentosUsados||[]).length === 0
+          ? '<div class="text-sm" style="color:var(--muted);">Nenhum equipamento associado.</div>'
+          : (o.equipamentosUsados||[]).map(eqId => {
+              const eq = state.equipment.find(e=>e.id===eqId);
+              return eq ? `<span class="equip-chip">🔧 ${escapeHtml(eq.nome)}<button onclick="removeEquipFromObra('${eqId}')">✕</button></span>` : '';
+            }).join('')
+        }
+        <div class="mt-3">
+          <select class="select" id="equip-add-sel" onchange="addEquipToObra(this.value);this.value='';">
+            <option value="">+ Adicionar equipamento da empresa...</option>
+            ${state.equipment.filter(e => !(o.equipamentosUsados||[]).includes(e.id)).map(e => `<option value="${e.id}">${escapeAttr(e.nome)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <h3 class="serif text-lg font-bold mt-6 mb-3">🧪 Ficheiros de Testes & Documentos</h3>
+      <div class="section-box">
+        ${renderDropZone('dz-cobre','Testes de Cobre', o.ficheiros.cobre)}
+        <div class="mt-4">${renderDropZone('dz-coaxial','Testes de Coaxial', o.ficheiros.coaxial)}</div>
+        <div class="mt-4">${renderDropZone('dz-fibra','Testes de Fibra Ótica', o.ficheiros.fibra)}</div>
+        <div class="mt-4">${renderDropZone('dz-fotos','Fotos da Obra', o.ficheiros.fotos)}</div>
+        <div class="mt-4">${renderDropZone('dz-outros','Outros Documentos', o.ficheiros.outros)}</div>
+      </div>
+
+      <div class="flex justify-between mt-6">
+        ${id?`<button class="btn btn-danger" onclick="deleteObra('${id}')">Eliminar</button>`:'<div></div>'}
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="${id?`openObra('${id}')`:'closeModal()'}">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveObra()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+  // attach drop handlers after DOM is in place
+  setTimeout(() => {
+    attachDropZone('dz-cobre', o.ficheiros.cobre, () => { syncObraFromForm(); _renderObraModal(); });
+    attachDropZone('dz-coaxial', o.ficheiros.coaxial, () => { syncObraFromForm(); _renderObraModal(); });
+    attachDropZone('dz-fibra', o.ficheiros.fibra, () => { syncObraFromForm(); _renderObraModal(); });
+    attachDropZone('dz-fotos', o.ficheiros.fotos, () => { syncObraFromForm(); _renderObraModal(); });
+    attachDropZone('dz-outros', o.ficheiros.outros, () => { syncObraFromForm(); _renderObraModal(); });
+    // Refresh catalog status icons on every input change in cabo/material rows
+    document.querySelectorAll('[data-c],[data-m]').forEach(el => {
+      el.addEventListener('input', () => {
+        clearTimeout(window._catRefreshT);
+        window._catRefreshT = setTimeout(refreshCatalogRowStatus, 200);
+      });
+    });
+  }, 0);
+}
+
+function addEquipToObra(eqId){
+  if(!eqId) return;
+  syncObraFromForm();
+  window._editingObra.equipamentosUsados = window._editingObra.equipamentosUsados || [];
+  if(!window._editingObra.equipamentosUsados.includes(eqId)) window._editingObra.equipamentosUsados.push(eqId);
+  _renderObraModal();
+}
+function removeEquipFromObra(eqId){
+  syncObraFromForm();
+  window._editingObra.equipamentosUsados = (window._editingObra.equipamentosUsados||[]).filter(x=>x!==eqId);
+  _renderObraModal();
+}
+
+function toggleItedSection(checked){
+  syncObraFromForm();
+  window._editingObra.incluiFichaIted = checked;
+  _renderObraModal();
+}
+
+function refreshCatalogRowStatus(){
+  const o = window._editingObra;
+  if(!o || !o.incluiFichaIted) return;
+  // Sync current values from inputs into o without re-rendering
+  document.querySelectorAll('[data-c]').forEach(el=>{
+    const i=+el.dataset.i, k=el.dataset.c;
+    if(!o.cabos[i]) o.cabos[i]={tecnologia:'',marca:'',classe:'',ref:''};
+    if(k==='tec') o.cabos[i].tecnologia=el.value;
+    if(k==='marca') o.cabos[i].marca=el.value;
+    if(k==='classe') o.cabos[i].classe=el.value;
+    if(k==='ref') o.cabos[i].ref=el.value;
+  });
+  document.querySelectorAll('[data-m]').forEach(el=>{
+    const i=+el.dataset.i, k=el.dataset.m;
+    if(!o.materiais[i]) o.materiais[i]={designacao:'',marca:'',ref:''};
+    if(k==='des') o.materiais[i].designacao=el.value;
+    if(k==='marca') o.materiais[i].marca=el.value;
+    if(k==='ref') o.materiais[i].ref=el.value;
+  });
+  // Update icons in the cabo rows
+  const caboRows = document.querySelectorAll('[data-c="tec"]');
+  caboRows.forEach((el,_) => {
+    const i = +el.dataset.i;
+    const span = el.parentElement.querySelector('span[title]');
+    if(span && o.cabos[i]){
+      const s = catalogRowStatus(o.cabos[i], 'cabo');
+      span.textContent = s.icon;
+      span.title = s.title;
+    }
+  });
+  const matRows = document.querySelectorAll('[data-m="des"]');
+  matRows.forEach((el,_) => {
+    const i = +el.dataset.i;
+    const span = el.parentElement.querySelector('span[title]');
+    if(span && o.materiais[i]){
+      const s = catalogRowStatus(o.materiais[i], 'material');
+      span.textContent = s.icon;
+      span.title = s.title;
+    }
+  });
+}
+
+function syncObraFromForm(){
+  const o = window._editingObra;
+  const val = id => { const el=document.getElementById(id); return el?el.value:''; };
+  const chk = id => { const el=document.getElementById(id); return el?el.checked:false; };
+  o.numero = parseInt(val('o-numero'))||o.numero;
+  o.ano = parseInt(val('o-ano'))||o.ano||currentYear();
+  o.data = val('o-data');
+  o.dataConclusao = val('o-dataconc');
+  o.estado = val('o-estado')||'em_curso';
+  o.descricao = val('o-desc');
+  o.observacoes = val('o-obs');
+  o.valor = parseFloat(val('o-valor'))||0;
+  o.valorPago = parseFloat(val('o-valorpago'))||0;
+  o.dataPagamento = val('o-datapago');
+  o.incluiFichaIted = chk('o-incluiIted');
+  if(o.incluiFichaIted){
+    o.refId = val('o-refid');
+    o.instalador.nome = val('o-inst-nome');
+    o.instalador.nif = val('o-inst-nif');
+    o.instalador.numero = val('o-inst-num');
+    o.itur.morada = val('o-itur-morada');
+    o.itur.codPostal = val('o-itur-cp');
+    o.itur.localidade = val('o-itur-loc');
+    o.itur.coordenadas = val('o-itur-coord');
+    o.itur.manualIted = val('o-itur-manual');
+    document.querySelectorAll('[data-c]').forEach(el=>{
+      const i=+el.dataset.i, k=el.dataset.c;
+      if(!o.cabos[i]) o.cabos[i]={tecnologia:'',marca:'',classe:'',ref:''};
+      if(k==='tec') o.cabos[i].tecnologia=el.value;
+      if(k==='marca') o.cabos[i].marca=el.value;
+      if(k==='classe') o.cabos[i].classe=el.value;
+      if(k==='ref') o.cabos[i].ref=el.value;
+    });
+    document.querySelectorAll('[data-m]').forEach(el=>{
+      const i=+el.dataset.i, k=el.dataset.m;
+      if(!o.materiais[i]) o.materiais[i]={designacao:'',marca:'',ref:''};
+      if(k==='des') o.materiais[i].designacao=el.value;
+      if(k==='marca') o.materiais[i].marca=el.value;
+      if(k==='ref') o.materiais[i].ref=el.value;
+    });
+    o.docObrig.ensaios = chk('o-doc-ensaios');
+    o.docObrig.calibracao = chk('o-doc-calibracao');
+    o.docObrig.projeto = chk('o-doc-projeto');
+    o.docFacult = val('o-doc-facult');
+  }
+}
+
+function addCabo(){ syncObraFromForm(); window._editingObra.cabos.push({tecnologia:'',marca:'',classe:'',ref:''}); _renderObraModal(); }
+function addMat(){ syncObraFromForm(); window._editingObra.materiais.push({designacao:'',marca:'',ref:''}); _renderObraModal(); }
+function removeCabo(i){ syncObraFromForm(); window._editingObra.cabos.splice(i,1); _renderObraModal(); }
+function removeMat(i){ syncObraFromForm(); window._editingObra.materiais.splice(i,1); _renderObraModal(); }
+
+// ============ CATÁLOGO PICKER ============
+function pickFromCatalog(tipo, rowIndex){
+  syncObraFromForm();
+  const items = state.catalog.filter(c => tipo==='cabo' ? c.tipo==='cabo' : c.tipo!=='cabo');
+  const list = items.length === 0
+    ? `<div class="empty"><div class="empty-icon">📖</div>Catálogo vazio. Adicione artigos no separador "Catálogo" primeiro.</div>`
+    : items.map(c => `
+        <div class="card p-3 mb-2 cursor-pointer" onclick="applyCatalogItem('${tipo}',${rowIndex},'${c.id}')" style="transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
+          <div class="font-semibold">${escapeHtml(c.designacao||c.nome)}</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">
+            ${c.marca?'<strong>'+escapeHtml(c.marca)+'</strong>':''}${c.ref?' · Ref. '+escapeHtml(c.ref):''}${c.classe?' · '+escapeHtml(c.classe):''}${c.tecnologia?' · '+escapeHtml(c.tecnologia):''}
+          </div>
+          ${c.notas?`<div class="text-xs mt-1 italic" style="color:var(--ink-soft);">${escapeHtml(c.notas)}</div>`:''}
+        </div>
+      `).join('');
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Buscar no Catálogo · ${tipo==='cabo'?'Cabos':'Materiais'}</h2>
+        <button class="icon-btn text-xl" onclick="_renderObraModal()">✕</button>
+      </div>
+      <input class="input mb-4" id="cat-filter" placeholder="Filtrar por nome, marca ou referência..." oninput="filterCatalogPicker(this.value)">
+      <div id="cat-picker-list">${list}</div>
+    </div>
+  `);
+}
+function filterCatalogPicker(q){
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('#cat-picker-list .card').forEach(el => {
+    el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function applyCatalogItem(tipo, rowIndex, catalogId){
+  const c = state.catalog.find(x=>x.id===catalogId);
+  if(!c) return;
+  const o = window._editingObra;
+  if(tipo==='cabo'){
+    if(!o.cabos[rowIndex]) o.cabos[rowIndex]={tecnologia:'',marca:'',classe:'',ref:''};
+    if(c.tecnologia) o.cabos[rowIndex].tecnologia = c.tecnologia;
+    if(c.marca) o.cabos[rowIndex].marca = c.marca;
+    if(c.classe) o.cabos[rowIndex].classe = c.classe;
+    if(c.ref) o.cabos[rowIndex].ref = c.ref;
+  } else {
+    if(!o.materiais[rowIndex]) o.materiais[rowIndex]={designacao:'',marca:'',ref:''};
+    if(c.designacao||c.nome) o.materiais[rowIndex].designacao = c.designacao||c.nome;
+    if(c.marca) o.materiais[rowIndex].marca = c.marca;
+    if(c.ref) o.materiais[rowIndex].ref = c.ref;
+  }
+  _renderObraModal();
+}
+
+// ============ DETECÇÃO DE NOVOS / ALTERADOS NO CATÁLOGO ============
+function catalogRowStatus(item, tipo){
+  const designacao = (tipo === 'cabo' ? item.tecnologia : item.designacao) || '';
+  if(!designacao && !item.marca && !item.ref){
+    return {icon:'', title:''}; // linha vazia
+  }
+  const match = findCatalogMatch(item, tipo);
+  if(!match){
+    return {icon:'✨', title:'Novo · será adicionado ao catálogo ao guardar'};
+  }
+  // Verifica diferenças
+  const diff = (a,b) => (a||'').trim().toLowerCase() !== (b||'').trim().toLowerCase();
+  let hasDiff = false;
+  if(item.marca && diff(match.marca, item.marca)) hasDiff = true;
+  if(item.ref && diff(match.ref, item.ref)) hasDiff = true;
+  if(tipo === 'cabo'){
+    if(item.tecnologia && diff(match.tecnologia, item.tecnologia)) hasDiff = true;
+    if(item.classe && diff(match.classe, item.classe)) hasDiff = true;
+  } else {
+    if(item.designacao && diff(match.designacao, item.designacao)) hasDiff = true;
+  }
+  if(hasDiff) return {icon:'⚠', title:'Difere do catálogo · será atualizado ao guardar'};
+  return {icon:'⭐', title:'Já está no catálogo'};
+}
+
+function findCatalogMatch(item, tipo){
+  // Procura primeiro por referência (mais fiável)
+  if(item.ref){
+    const byRef = state.catalog.find(c => c.tipo === tipo && c.ref && c.ref.toLowerCase() === item.ref.toLowerCase());
+    if(byRef) return byRef;
+  }
+  // Senão, por marca + designação/tecnologia
+  const designacao = (tipo === 'cabo' ? item.tecnologia : item.designacao) || '';
+  if(!designacao && !item.marca) return null;
+  return state.catalog.find(c => {
+    if(c.tipo !== tipo) return false;
+    const cDes = (tipo === 'cabo' ? c.tecnologia : c.designacao) || '';
+    return cDes.toLowerCase() === designacao.toLowerCase()
+        && (c.marca||'').toLowerCase() === (item.marca||'').toLowerCase();
+  });
+}
+
+function obraCatalogDiff(obra){
+  // Devolve { novos: [...], alterados: [...] }
+  const novos = [];
+  const alterados = [];
+  const seen = new Set(); // evita duplicados dentro da mesma obra
+
+  const checkItem = (item, tipo) => {
+    const designacao = (tipo === 'cabo' ? item.tecnologia : item.designacao) || '';
+    if(!designacao && !item.marca && !item.ref) return; // linha vazia
+    const key = tipo + '|' + (item.ref||'').toLowerCase() + '|' + designacao.toLowerCase() + '|' + (item.marca||'').toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+
+    const match = findCatalogMatch(item, tipo);
+    if(!match){
+      novos.push({tipo, item});
+    } else {
+      // Verifica se há diferenças
+      const diffs = [];
+      const cmp = (catalogVal, obraVal, field) => {
+        catalogVal = (catalogVal||'').trim();
+        obraVal = (obraVal||'').trim();
+        if(obraVal && catalogVal !== obraVal) diffs.push({field, catalogVal, obraVal});
+      };
+      if(tipo === 'cabo'){
+        cmp(match.tecnologia, item.tecnologia, 'Tecnologia');
+        cmp(match.classe, item.classe, 'Classe RPC');
+      } else {
+        cmp(match.designacao, item.designacao, 'Designação');
+      }
+      cmp(match.marca, item.marca, 'Marca');
+      cmp(match.ref, item.ref, 'Referência');
+      if(diffs.length > 0){
+        alterados.push({tipo, item, match, diffs});
+      }
+    }
+  };
+
+  (obra.cabos||[]).forEach(c => checkItem(c, 'cabo'));
+  (obra.materiais||[]).forEach(m => checkItem(m, 'material'));
+  return { novos, alterados };
+}
+
+function showCatalogSyncDialog(diff, onDone){
+  if(diff.novos.length === 0 && diff.alterados.length === 0){
+    onDone(); return;
+  }
+  const novosHtml = diff.novos.map((n,i) => {
+    const desc = n.tipo === 'cabo'
+      ? `<strong>${escapeHtml(n.item.tecnologia||'(sem tecnologia)')}</strong>${n.item.classe?' · '+escapeHtml(n.item.classe):''}`
+      : `<strong>${escapeHtml(n.item.designacao||'(sem designação)')}</strong>`;
+    const sub = `${n.item.marca?escapeHtml(n.item.marca):'<em style="color:var(--muted);">sem marca</em>'}${n.item.ref?' · Ref. '+escapeHtml(n.item.ref):''}`;
+    return `
+      <label class="file-item" style="cursor:pointer;">
+        <input type="checkbox" data-novo="${i}" checked style="margin-right:4px;">
+        <div style="flex:1;">
+          <div>${n.tipo==='cabo'?'🔌':'📦'} ${desc}</div>
+          <div class="text-xs" style="color:var(--muted);">${sub}</div>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  const altHtml = diff.alterados.map((a,i) => {
+    const nome = a.tipo === 'cabo' ? (a.item.tecnologia||a.match.tecnologia||'') : (a.item.designacao||a.match.designacao||'');
+    const diffsTxt = a.diffs.map(d => `<div class="text-xs"><strong>${d.field}:</strong> <span style="color:var(--muted);text-decoration:line-through;">${escapeHtml(d.catalogVal||'(vazio)')}</span> → <span style="color:var(--ok);">${escapeHtml(d.obraVal)}</span></div>`).join('');
+    return `
+      <label class="file-item" style="cursor:pointer;align-items:flex-start;">
+        <input type="checkbox" data-alt="${i}" checked style="margin-top:3px;margin-right:4px;">
+        <div style="flex:1;">
+          <div>${a.tipo==='cabo'?'🔌':'📦'} <strong>${escapeHtml(nome)}</strong> ${a.item.marca?'· '+escapeHtml(a.item.marca):''}</div>
+          <div style="margin-top:5px;">${diffsTxt}</div>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-2">📖 Sincronizar com Catálogo</h2>
+      <p class="text-sm mb-5" style="color:var(--ink-soft);">Encontrei artigos na ficha que podem ser guardados ou atualizados no catálogo. Desmarque o que não quiser sincronizar.</p>
+
+      ${diff.novos.length > 0 ? `
+        <h3 class="serif text-lg font-bold mb-3">✨ Novos artigos (${diff.novos.length})</h3>
+        <div class="mb-5">${novosHtml}</div>
+      ` : ''}
+
+      ${diff.alterados.length > 0 ? `
+        <h3 class="serif text-lg font-bold mb-3">🔄 Atualizações de artigos existentes (${diff.alterados.length})</h3>
+        <div class="mb-5">${altHtml}</div>
+      ` : ''}
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-ghost" id="cat-skip-btn">Não sincronizar</button>
+        <button class="btn btn-primary" id="cat-apply-btn">Aplicar selecionados</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('cat-skip-btn').onclick = () => { closeModal(); onDone(); };
+  document.getElementById('cat-apply-btn').onclick = async () => {
+    // Adicionar novos selecionados
+    document.querySelectorAll('[data-novo]').forEach(cb => {
+      if(cb.checked){
+        const n = diff.novos[+cb.dataset.novo];
+        const newItem = {
+          id: uid(),
+          tipo: n.tipo,
+          tecnologia: n.tipo === 'cabo' ? (n.item.tecnologia||'') : '',
+          designacao: n.tipo !== 'cabo' ? (n.item.designacao||'') : '',
+          marca: n.item.marca || '',
+          ref: n.item.ref || '',
+          classe: n.tipo === 'cabo' ? (n.item.classe||'') : '',
+          notas: ''
+        };
+        state.catalog.push(newItem);
+      }
+    });
+    // Aplicar alterações aos existentes
+    document.querySelectorAll('[data-alt]').forEach(cb => {
+      if(cb.checked){
+        const a = diff.alterados[+cb.dataset.alt];
+        const idx = state.catalog.findIndex(c => c.id === a.match.id);
+        if(idx >= 0){
+          a.diffs.forEach(d => {
+            const fieldMap = {'Tecnologia':'tecnologia','Classe RPC':'classe','Designação':'designacao','Marca':'marca','Referência':'ref'};
+            const k = fieldMap[d.field];
+            if(k) state.catalog[idx][k] = d.obraVal;
+          });
+        }
+      }
+    });
+    await save('catalog');
+    closeModal();
+    onDone();
+  };
+}
+
+async function saveObra(){
+  syncObraFromForm();
+  const data = window._editingObra;
+  const id = window._editingObraId;
+  if(!data.descricao){ alert('A descrição é obrigatória'); return; }
+  let finalId = id;
+  if(id){
+    const i = state.obras.findIndex(o=>o.id===id);
+    state.obras[i] = {...data, id};
+  } else {
+    finalId = uid();
+    state.obras.push({...data, id:finalId});
+  }
+  await save('obras');
+
+  // Verificar catálogo só se a obra tiver Ficha ITED
+  if(data.incluiFichaIted){
+    const diff = obraCatalogDiff(data);
+    if(diff.novos.length > 0 || diff.alterados.length > 0){
+      showCatalogSyncDialog(diff, () => openObra(finalId));
+      return;
+    }
+  }
+  openObra(finalId);
+}
+
+function deleteObra(id){
+  confirmAction('Eliminar esta obra? Esta ação não pode ser revertida.', async () => {
+    state.obras = state.obras.filter(o=>o.id!==id);
+    await save('obras');
+    closeModal();
+  });
+}
+
+// ============ PDF / PREVIEW ITED ============
+function previewObraPDF(id){
+  const o = state.obras.find(x=>x.id===id); if(!o) return;
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Ficha ITED · Obra ${obraLabel(o)}</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="openObra('${id}')">Voltar</button>
+          <button class="btn btn-accent" onclick="exportObraPDF('${id}')">↓ Exportar PDF</button>
+          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+      <div style="max-width:100%;overflow-x:auto;background:#d8dde5;padding:20px;border-radius:10px;">
+        <div id="ited-preview" style="margin:0 auto;">${renderItedSheet(o)}</div>
+      </div>
+    </div>
+  `);
+}
+
+function renderItedSheet(o){
+  const mkMarca = x => {
+    const m = x.marca || '';
+    const r = x.ref || '';
+    if(m && r) return m + ' · Ref. ' + r;
+    return m || r || '';
+  };
+  const cabosRows = (o.cabos||[]).filter(x=>x.tecnologia||x.marca||x.classe||x.ref).map(x=>`
+    <tr><td>${escapeHtml(x.tecnologia||'')}</td><td>${escapeHtml(mkMarca(x))}</td><td>${escapeHtml(x.classe||'')}</td></tr>
+  `).join('') || '<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>';
+  const matRows = (o.materiais||[]).filter(x=>x.designacao||x.marca||x.ref).map(x=>`
+    <tr><td>${escapeHtml(x.designacao||'')}</td><td>${escapeHtml(mkMarca(x))}</td></tr>
+  `).join('') || '<tr><td>&nbsp;</td><td>&nbsp;</td></tr>';
+  return `
+  <div class="ited-sheet">
+    <div class="trited-header">
+      <div>
+        <img src="${getLogoSrc()}" alt="TRITED" style="height:50px;display:block;">
+        <div class="brand-sub" style="margin-top:2px;">Infraestruturas de Telecomunicações</div>
+      </div>
+      <div style="text-align:right;font-size:10px;color:#555;">
+        <div><strong>Obra ${obraLabel(o)}</strong></div>
+        <div>${fmtDate(o.data)}</div>
+      </div>
+    </div>
+    <h1>FICHA DE IDENTIFICAÇÕES (ITED)</h1>
+    <div class="ited-row">
+      <div class="ited-cell" style="flex:2;"><div class="ited-label">Ref. ID.</div><div class="ited-val">${escapeHtml(o.refId||'')}</div></div>
+      <div class="ited-cell" style="flex:1;"><div class="ited-label">Data (dia/mês/ano)</div><div class="ited-val">${fmtDate(o.data)}</div></div>
+    </div>
+    <div class="ited-section">Instalador</div>
+    <div class="ited-row">
+      <div class="ited-cell" style="flex:2;"><div class="ited-label">Nome</div><div class="ited-val">${escapeHtml(o.instalador?.nome||'')}</div></div>
+      <div class="ited-cell"><div class="ited-label">NIF</div><div class="ited-val">${escapeHtml(o.instalador?.nif||'')}</div></div>
+      <div class="ited-cell"><div class="ited-label">Nº (ANACOM, OE, OET)</div><div class="ited-val">${escapeHtml(o.instalador?.numero||'')}</div></div>
+    </div>
+    <div class="ited-section">ITUR</div>
+    <div class="ited-row"><div class="ited-cell"><div class="ited-label">Morada</div><div class="ited-val">${escapeHtml(o.itur?.morada||'')}</div></div></div>
+    <div class="ited-row">
+      <div class="ited-cell"><div class="ited-label">Código Postal</div><div class="ited-val">${escapeHtml(o.itur?.codPostal||'')}</div></div>
+      <div class="ited-cell"><div class="ited-label">Localidade</div><div class="ited-val">${escapeHtml(o.itur?.localidade||'')}</div></div>
+    </div>
+    <div class="ited-row"><div class="ited-cell"><div class="ited-label">Coordenadas Geográficas</div><div class="ited-val">${escapeHtml(o.itur?.coordenadas||'')}</div></div></div>
+    <div class="ited-row"><div class="ited-cell"><div class="ited-label">Manual ITED Aplicável</div><div class="ited-val">${escapeHtml(o.itur?.manualIted||'')}</div></div></div>
+    <div class="ited-section">Cabos Instalados</div>
+    <table class="ited-tab">
+      <tr><th style="width:25%;">Tecnologia</th><th>Marca e Modelo / Referência</th><th style="width:20%;">Classe RPC</th></tr>
+      ${cabosRows}
+    </table>
+    <div class="ited-section" style="margin-top:8px;">Outros Materiais e Dispositivos Instalados</div>
+    <table class="ited-tab">
+      <tr><th style="width:35%;">Designação</th><th>Marca e Modelo / Referência</th></tr>
+      ${matRows}
+    </table>
+    <div class="ited-section" style="margin-top:8px;">Documentação Obrigatória</div>
+    <div class="doc-list">
+      <p>${o.docObrig?.ensaios?'☑':'☐'} Resultados dos ensaios com indicação da data e do técnico que os realizou</p>
+      <p>${o.docObrig?.calibracao?'☑':'☐'} Cópia dos certificados de calibração dos equipamentos utilizados nos ensaios</p>
+      <p>${o.docObrig?.projeto?'☑':'☐'} Cópia do projeto</p>
+    </div>
+    <div class="ited-section" style="margin-top:8px;">Documentação Facultativa</div>
+    <div class="doc-list"><p>${escapeHtml(o.docFacult||'—')}</p></div>
+  </div>`;
+}
+
+async function exportObraZIP(id){
+  const o = state.obras.find(x=>x.id===id);
+  if(!o){ alert('Obra não encontrada'); return; }
+  if(typeof JSZip === 'undefined'){ alert('JSZip ainda não carregou. Tente novamente.'); return; }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+  overlay.style.zIndex = '90';
+  overlay.innerHTML = '<div class="modal" style="max-width:380px;"><div class="p-6 text-center"><div style="font-size:36px;margin-bottom:8px;">📦</div><h3 class="text-xl font-bold mb-2">A gerar ZIP...</h3><p class="text-sm" style="color:var(--muted);" id="zip-progress">A preparar</p></div></div>';
+  document.body.appendChild(overlay);
+  const progress = (msg) => { const p = document.getElementById('zip-progress'); if(p) p.textContent = msg; };
+
+  try {
+    const zip = new JSZip();
+    const cliente = state.clients.find(c=>c.id===o.clienteId);
+    const obraTag = obraLabel(o);
+    let indice = ['INDICE - Obra ' + obraTag, '='.repeat(40), ''];
+    indice.push('Data: ' + fmtDate(o.data));
+    if(cliente) indice.push('Cliente: ' + cliente.nome);
+    indice.push('Descricao: ' + (o.descricao || '-'));
+    indice.push('Valor: ' + fmt(o.valor));
+    indice.push('');
+
+    if(o.incluiFichaIted){
+      progress('A gerar Ficha ITED em PDF...');
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '-10000px';
+      tempDiv.innerHTML = renderItedSheet(o);
+      document.body.appendChild(tempDiv);
+      try {
+        const canvas = await html2canvas(tempDiv.firstElementChild, {scale:2, backgroundColor:'#ffffff'});
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        const pageW = pdf.internal.pageSize.getWidth();
+        const imgW = pageW - 20;
+        const imgH = canvas.height * imgW / canvas.width;
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
+        zip.file('01_Ficha_ITED.pdf', pdf.output('blob'));
+        indice.push('01_Ficha_ITED.pdf');
+      } finally { document.body.removeChild(tempDiv); }
+    }
+
+    const cats = { cobre:'02_Testes/Cobre', coaxial:'02_Testes/Coaxial', fibra:'02_Testes/Fibra' };
+    for(const [k, folder] of Object.entries(cats)){
+      for(const f of ((o.ficheiros && o.ficheiros[k]) || [])){
+        progress('A juntar: ' + f.name);
+        const data = await readFile(f.key);
+        if(data){ zip.file(folder + '/' + f.name, dataUrlToBlob(data)); indice.push(folder + '/' + f.name); }
+      }
+    }
+
+    const equipsUsados = (o.equipamentosUsados||[]).map(eqId => state.equipment.find(e=>e.id===eqId)).filter(Boolean);
+    for(const eq of equipsUsados){
+      const safeName = eq.nome.replace(/[\/\\:*?"<>|]/g,'_');
+      const folder = '03_Equipamentos_Utilizados/' + safeName;
+      let info = ['Equipamento: ' + eq.nome];
+      if(eq.tipo) info.push('Tipo: ' + eq.tipo);
+      if(eq.numeroSerie) info.push('Nº Série: ' + eq.numeroSerie);
+      if(eq.dataCompra) info.push('Data de compra: ' + fmtDate(eq.dataCompra));
+      if(eq.licencas && eq.licencas.length){
+        info.push(''); info.push('Licencas / Calibracoes:');
+        eq.licencas.forEach(l => info.push('  - ' + (l.nome||'') + (l.dataInicio?' · inicio '+fmtDate(l.dataInicio):'') + (l.dataFim?' · valido ate '+fmtDate(l.dataFim):'')));
+      }
+      zip.file(folder + '/INFO.txt', info.join('\n'));
+      indice.push(folder + '/INFO.txt');
+      for(const f of (eq.ficheiros||[])){
+        progress('A juntar: ' + f.name);
+        const data = await readFile(f.key);
+        if(data){ zip.file(folder + '/' + f.name, dataUrlToBlob(data)); indice.push(folder + '/' + f.name); }
+      }
+    }
+
+    for(const f of ((o.ficheiros && o.ficheiros.fotos) || [])){
+      progress('A juntar: ' + f.name);
+      const data = await readFile(f.key);
+      if(data){ zip.file('04_Fotos/' + f.name, dataUrlToBlob(data)); indice.push('04_Fotos/' + f.name); }
+    }
+    for(const f of ((o.ficheiros && o.ficheiros.outros) || [])){
+      progress('A juntar: ' + f.name);
+      const data = await readFile(f.key);
+      if(data){ zip.file('05_Outros_Documentos/' + f.name, dataUrlToBlob(data)); indice.push('05_Outros_Documentos/' + f.name); }
+    }
+
+    zip.file('INDICE.txt', indice.join('\n'));
+    progress('A comprimir...');
+    const blob = await zip.generateAsync({type:'blob'}, m => progress('A comprimir... ' + Math.round(m.percent) + '%'));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'TRITED_Obra_' + obraTag + '.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch(e){
+    alert('Erro ao gerar ZIP: ' + e.message);
+  } finally {
+    overlay.remove();
+  }
+}
+
+async function exportObraPDF(id){
+  const o = state.obras.find(x=>x.id===id);
+  const el = document.getElementById('ited-preview').firstElementChild;
+  try {
+    const canvas = await html2canvas(el, {scale:2, backgroundColor:'#ffffff'});
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW - 20;
+    const imgH = canvas.height * imgW / canvas.width;
+    if(imgH < pageH - 20){
+      pdf.addImage(imgData, 'PNG', 10, 10, imgW, imgH);
+    } else {
+      let remaining = imgH;
+      let sY = 0;
+      const pagePx = (pageH - 20) * canvas.width / imgW;
+      while(remaining > 0){
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = Math.min(pagePx, canvas.height - sY);
+        slice.getContext('2d').drawImage(canvas, 0, sY, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+        const sliceImg = slice.toDataURL('image/png');
+        const sliceH = slice.height * imgW / canvas.width;
+        pdf.addImage(sliceImg, 'PNG', 10, 10, imgW, sliceH);
+        sY += slice.height;
+        remaining -= sliceH;
+        if(remaining > 0) pdf.addPage();
+      }
+    }
+    pdf.save(`TRITED_Obra_${obraLabel(o)}_Ficha_ITED.pdf`);
+  } catch(e){ alert('Erro ao gerar PDF: '+e.message); }
+}
+
+// ============ OBRAS (LISTA POR ANO) ============
+let obrasFilter = 'todas'; // 'todas' | 'abertas' | 'concluidas' | 'canceladas'
+
+function setObrasFilter(f){ obrasFilter = f; renderView(); }
+
+function viewObras(){
+  if(state.obras.length === 0){
+    return `
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold">Obras</h2>
+      <button class="btn btn-accent" onclick="editObra()">+ Nova Obra</button>
+    </div>
+    <div class="card empty"><div class="empty-icon">🔨</div>Sem obras. Clique em "+ Nova Obra" para criar a primeira.</div>`;
+  }
+
+  // Estados considerados "em aberto" (não concluídas nem canceladas)
+  const ABERTAS = ['em_curso','pausada','aguarda_material','espera_cliente','falta_termo','pronto_faturar'];
+  const abertasCount = state.obras.filter(o => ABERTAS.includes(o.estado||'em_curso')).length;
+  const concluidasCount = state.obras.filter(o => o.estado === 'concluida').length;
+  const canceladasCount = state.obras.filter(o => o.estado === 'cancelada').length;
+  const aguardaMatCount = state.obras.filter(o => o.estado === 'aguarda_material').length;
+  const esperaClienteCount = state.obras.filter(o => o.estado === 'espera_cliente').length;
+  const faltaTermoCount = state.obras.filter(o => o.estado === 'falta_termo').length;
+  const prontoFaturarCount = state.obras.filter(o => o.estado === 'pronto_faturar').length;
+
+  // Filter
+  const filtered = state.obras.filter(o => {
+    const e = o.estado || 'em_curso';
+    if(obrasFilter === 'todas') return true;
+    if(obrasFilter === 'abertas') return ABERTAS.includes(e);
+    if(obrasFilter === 'concluidas') return e === 'concluida';
+    if(obrasFilter === 'canceladas') return e === 'cancelada';
+    if(obrasFilter === 'aguarda_material') return e === 'aguarda_material';
+    if(obrasFilter === 'espera_cliente') return e === 'espera_cliente';
+    if(obrasFilter === 'falta_termo') return e === 'falta_termo';
+    if(obrasFilter === 'pronto_faturar') return e === 'pronto_faturar';
+    return true;
+  });
+
+  // Group by year
+  const byYear = {};
+  filtered.forEach(o => {
+    const y = Number(o.ano) || currentYear();
+    (byYear[y] = byYear[y] || []).push(o);
+  });
+  const years = Object.keys(byYear).map(Number).sort((a,b)=>b-a);
+
+  const totalDivida = state.obras.reduce((a,o)=>a+Math.max(0,Number(o.valor||0)-Number(o.valorPago||0)),0);
+  const totalRecebido = state.obras.reduce((a,o)=>a+Number(o.valorPago||0),0);
+
+  const filterBtn = (key, label, count, color) => `
+    <button class="btn ${obrasFilter===key?'btn-primary':'btn-ghost'}" onclick="setObrasFilter('${key}')" style="${obrasFilter!==key && color?'color:'+color:''}">
+      ${label} <span class="badge ${obrasFilter===key?'badge-neutral':''}" style="${obrasFilter===key?'background:rgba(255,255,255,.2);color:#fff;':''}margin-left:4px;">${count}</span>
+    </button>
+  `;
+
+  return `
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div>
+      <h2 class="text-2xl font-bold">Obras</h2>
+      <p class="text-sm" style="color:var(--muted);">${state.obras.length} obra(s) · Por receber <span style="color:var(--accent);font-weight:600;">${fmt(totalDivida)}</span> · Recebido <span style="color:var(--ok);font-weight:600;">${fmt(totalRecebido)}</span></p>
+    </div>
+    <button class="btn btn-accent" onclick="editObra()">+ Nova Obra</button>
+  </div>
+
+  <div class="mb-6">
+    <div class="flex gap-2 mb-3 flex-wrap">
+      ${filterBtn('todas','Todas', state.obras.length)}
+      ${filterBtn('abertas','🔨 Em aberto', abertasCount, 'var(--blue)')}
+      ${filterBtn('concluidas','✓ Concluídas', concluidasCount, 'var(--ok)')}
+      ${filterBtn('canceladas','✕ Canceladas', canceladasCount, 'var(--danger)')}
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      ${filterBtn('aguarda_material','📦 Aguarda material', aguardaMatCount)}
+      ${filterBtn('espera_cliente','⏳ À espera do cliente', esperaClienteCount)}
+      ${filterBtn('falta_termo','📝 Falta termo', faltaTermoCount)}
+      ${filterBtn('pronto_faturar','💶 Pronto p/ faturar', prontoFaturarCount)}
+    </div>
+  </div>
+
+  ${filtered.length === 0 ? `<div class="card empty"><div class="empty-icon">🔍</div>Nenhuma obra neste filtro</div>` : ''}
+
+  ${years.map(y => {
+    const obs = [...byYear[y]].sort((a,b)=>(Number(b.numero)||0)-(Number(a.numero)||0));
+    const yearDivida = obs.reduce((a,o)=>a+Math.max(0,Number(o.valor||0)-Number(o.valorPago||0)),0);
+    const yearTotal = obs.reduce((a,o)=>a+Number(o.valor||0),0);
+    return `
+      <div class="card mb-6">
+        <div class="flex items-center justify-between p-5 pb-3" style="border-bottom:1px solid var(--line);">
+          <div>
+            <h3 class="text-xl font-bold serif">${y}</h3>
+            <p class="text-xs mt-1" style="color:var(--muted);">${obs.length} obra(s) · Total ${fmt(yearTotal)}${yearDivida>0?' · Por receber <span style="color:var(--accent);font-weight:600;">'+fmt(yearDivida)+'</span>':''}</p>
+          </div>
+          <span class="badge badge-blue">${y}</span>
+        </div>
+        <table>
+          <thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Estado</th><th>Pagamento</th></tr></thead>
+          <tbody>
+            ${obs.map(o => {
+              const c = state.clients.find(x=>x.id===o.clienteId);
+              const pay = paymentStatus(o);
+              const est = obraEstado(o);
+              return `<tr class="clickable" onclick="openObra('${o.id}')">
+                <td class="obra-num">${obraLabel(o)}</td>
+                <td>${fmtDate(o.data)}</td>
+                <td>${escapeHtml(c?c.nome:'—')}</td>
+                <td>${escapeHtml((o.descricao||'').slice(0,55))}${o.incluiFichaIted?' <span class="badge badge-blue">ITED</span>':''}</td>
+                <td class="font-semibold">${fmt(o.valor)}</td>
+                <td><span class="badge ${est.cls}">${est.label}</span></td>
+                <td><span class="badge ${pay.cls}">${pay.label}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).join('')}`;
+}
+
+// ============ CATÁLOGO ============
+function viewCatalogo(){
+  const cabos = state.catalog.filter(c => c.tipo === 'cabo');
+  const materiais = state.catalog.filter(c => c.tipo !== 'cabo');
+  return `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="text-2xl font-bold">Catálogo de Material</h2>
+      <p class="text-sm" style="color:var(--muted);">${state.catalog.length} artigo(s) · ${cabos.length} cabo(s) · ${materiais.length} material(is)</p>
+    </div>
+    <button class="btn btn-accent" onclick="editCatItem()">+ Novo Artigo</button>
+  </div>
+
+  <div class="card mb-6">
+    <div class="p-5 pb-3" style="border-bottom:1px solid var(--line);">
+      <h3 class="text-lg font-bold serif">Cabos</h3>
+      <p class="text-xs mt-1" style="color:var(--muted);">${cabos.length} artigo(s)</p>
+    </div>
+    ${cabos.length === 0
+      ? `<div class="empty">Sem cabos no catálogo</div>`
+      : `<table>
+          <thead><tr><th>Tecnologia</th><th>Marca / Modelo</th><th>Referência</th><th>Classe RPC</th><th></th></tr></thead>
+          <tbody>${cabos.map(c => `
+            <tr class="clickable" onclick="editCatItem('${c.id}')">
+              <td class="font-semibold">${escapeHtml(c.tecnologia||c.designacao||'—')}</td>
+              <td>${escapeHtml(c.marca||'—')}</td>
+              <td>${escapeHtml(c.ref||'—')}</td>
+              <td>${escapeHtml(c.classe||'—')}</td>
+              <td class="text-right"><span style="color:var(--muted);">→</span></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>`
+    }
+  </div>
+
+  <div class="card">
+    <div class="p-5 pb-3" style="border-bottom:1px solid var(--line);">
+      <h3 class="text-lg font-bold serif">Outros Materiais</h3>
+      <p class="text-xs mt-1" style="color:var(--muted);">${materiais.length} artigo(s)</p>
+    </div>
+    ${materiais.length === 0
+      ? `<div class="empty">Sem materiais no catálogo</div>`
+      : `<table>
+          <thead><tr><th>Designação</th><th>Marca / Modelo</th><th>Referência</th><th>Notas</th><th></th></tr></thead>
+          <tbody>${materiais.map(c => `
+            <tr class="clickable" onclick="editCatItem('${c.id}')">
+              <td class="font-semibold">${escapeHtml(c.designacao||c.nome||'—')}</td>
+              <td>${escapeHtml(c.marca||'—')}</td>
+              <td>${escapeHtml(c.ref||'—')}</td>
+              <td>${escapeHtml((c.notas||'').slice(0,40))}</td>
+              <td class="text-right"><span style="color:var(--muted);">→</span></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>`
+    }
+  </div>`;
+}
+
+function editCatItem(id){
+  const c = id ? state.catalog.find(x=>x.id===id) : {tipo:'material',tecnologia:'',designacao:'',marca:'',ref:'',classe:'',notas:''};
+  window._editingCat = JSON.parse(JSON.stringify(c));
+  window._editingCatId = id || null;
+  _renderCatItemModal();
+}
+
+function _renderCatItemModal(){
+  const c = window._editingCat;
+  const id = window._editingCatId;
+  const isCabo = c.tipo === 'cabo';
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${id?'Editar':'Novo'} Artigo do Catálogo</h2>
+
+      <div class="mb-4">
+        <label class="label">Tipo</label>
+        <div class="flex gap-2">
+          <button class="btn ${isCabo?'btn-primary':'btn-ghost'}" onclick="switchCatType('cabo')">Cabo</button>
+          <button class="btn ${!isCabo?'btn-primary':'btn-ghost'}" onclick="switchCatType('material')">Material / Dispositivo</button>
+        </div>
+      </div>
+
+      ${isCabo ? `
+        <div class="grid-2">
+          <div><label class="label">Tecnologia *</label><input class="input" id="cat-tec" value="${escapeAttr(c.tecnologia||'')}" placeholder="ex: Pares de Cobre, Fibra Ótica"></div>
+          <div><label class="label">Classe RPC</label><input class="input" id="cat-classe" value="${escapeAttr(c.classe||'')}" placeholder="ex: Eca, Dca-s2"></div>
+          <div><label class="label">Marca e Modelo</label><input class="input" id="cat-marca" value="${escapeAttr(c.marca||'')}"></div>
+          <div><label class="label">Referência do Produto</label><input class="input" id="cat-ref" value="${escapeAttr(c.ref||'')}"></div>
+        </div>
+      ` : `
+        <div class="grid-2">
+          <div><label class="label">Designação *</label><input class="input" id="cat-des" value="${escapeAttr(c.designacao||'')}" placeholder="ex: Tomada RJ45, Repartidor"></div>
+          <div><label class="label">Marca e Modelo</label><input class="input" id="cat-marca" value="${escapeAttr(c.marca||'')}"></div>
+          <div><label class="label">Referência do Produto</label><input class="input" id="cat-ref" value="${escapeAttr(c.ref||'')}"></div>
+        </div>
+      `}
+
+      <div class="mt-3"><label class="label">Notas / Especificações</label><textarea class="input" id="cat-notas" rows="3" placeholder="Características técnicas, observações...">${escapeHtml(c.notas||'')}</textarea></div>
+
+      <div class="flex justify-between mt-6">
+        ${id?`<button class="btn btn-danger" onclick="deleteCatItem('${id}')">Eliminar</button>`:'<div></div>'}
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveCatItem()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function switchCatType(tipo){
+  syncCatItemFromForm();
+  window._editingCat.tipo = tipo;
+  _renderCatItemModal();
+}
+
+function syncCatItemFromForm(){
+  const c = window._editingCat;
+  const val = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
+  if(c.tipo === 'cabo'){
+    c.tecnologia = val('cat-tec');
+    c.classe = val('cat-classe');
+    c.designacao = '';
+  } else {
+    c.designacao = val('cat-des');
+    c.tecnologia = '';
+    c.classe = '';
+  }
+  c.marca = val('cat-marca');
+  c.ref = val('cat-ref');
+  c.notas = val('cat-notas');
+}
+
+async function saveCatItem(){
+  syncCatItemFromForm();
+  const c = window._editingCat;
+  const id = window._editingCatId;
+  if(c.tipo === 'cabo' && !c.tecnologia){ alert('Tecnologia é obrigatória'); return; }
+  if(c.tipo !== 'cabo' && !c.designacao){ alert('Designação é obrigatória'); return; }
+  if(id){
+    const i = state.catalog.findIndex(x=>x.id===id);
+    state.catalog[i] = {...c, id};
+  } else {
+    state.catalog.push({...c, id:uid()});
+  }
+  await save('catalog');
+  closeModal();
+}
+
+function deleteCatItem(id){
+  confirmAction('Eliminar este artigo do catálogo?', async () => {
+    state.catalog = state.catalog.filter(x=>x.id!==id);
+    await save('catalog');
+    closeModal();
+  });
+}
+
+// ============ INVENTÁRIO ============
+function viewInventario(){
+  const total = state.inventory.reduce((a,b)=>a+Number(b.quantidade||0)*Number(b.precoUnitario||0),0);
+  return `
+  <div class="flex items-center justify-between mb-6">
+    <div><h2 class="text-2xl font-bold">Inventário</h2><p class="text-sm" style="color:var(--muted);">${state.inventory.length} artigo(s) · Valor total: <span class="font-semibold" style="color:var(--ink);">${fmt(total)}</span></p></div>
+    <button class="btn btn-accent" onclick="editItem()">+ Novo Artigo</button>
+  </div>
+  ${state.inventory.length===0
+    ? `<div class="card empty"><div class="empty-icon">📦</div>Sem artigos em inventário.</div>`
+    : `<div class="card"><table><thead><tr><th>Artigo</th><th>Categoria</th><th>Quantidade</th><th>Preço Unit.</th><th>Valor</th><th></th></tr></thead><tbody>${
+        state.inventory.map(it=>{
+          const valor = Number(it.quantidade||0)*Number(it.precoUnitario||0);
+          return `<tr>
+            <td class="font-semibold">${escapeHtml(it.nome)}</td>
+            <td>${escapeHtml(it.categoria||'—')}</td>
+            <td>${it.quantidade||0} ${escapeHtml(it.unidade||'un')}</td>
+            <td>${fmt(it.precoUnitario)}</td>
+            <td class="font-semibold">${fmt(valor)}</td>
+            <td class="text-right"><button class="btn btn-ghost" onclick="editItem('${it.id}')">Editar</button> <button class="btn btn-danger" onclick="deleteItem('${it.id}')" title="Eliminar">🗑</button></td>
+          </tr>`;
+        }).join('')
+      }</tbody></table></div>`
+  }`;
+}
+function editItem(id){
+  const it = id ? state.inventory.find(x=>x.id===id) : {nome:'',categoria:'',quantidade:0,unidade:'un',precoUnitario:0,notas:''};
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${id?'Editar':'Novo'} Artigo</h2>
+      <div class="grid-2">
+        <div><label class="label">Nome *</label><input class="input" id="i-nome" value="${escapeAttr(it.nome)}"></div>
+        <div><label class="label">Categoria</label><input class="input" id="i-cat" value="${escapeAttr(it.categoria||'')}" placeholder="ex: Cabos, Tomadas"></div>
+        <div><label class="label">Quantidade</label><input class="input" type="number" step="0.01" id="i-qt" value="${it.quantidade||0}"></div>
+        <div><label class="label">Unidade</label><input class="input" id="i-un" value="${escapeAttr(it.unidade||'un')}" placeholder="un, m, kg..."></div>
+        <div><label class="label">Preço Unitário (€)</label><input class="input" type="number" step="0.01" id="i-preco" value="${it.precoUnitario||0}"></div>
+      </div>
+      <div class="mt-3"><label class="label">Notas</label><textarea class="input" id="i-notas" rows="2">${escapeHtml(it.notas||'')}</textarea></div>
+      <div class="flex justify-between mt-6">
+        ${id?`<button class="btn btn-danger" onclick="deleteItem('${id}')">Eliminar</button>`:'<div></div>'}
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveItem('${id||''}')">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+async function saveItem(id){
+  const data = {
+    nome: document.getElementById('i-nome').value.trim(),
+    categoria: document.getElementById('i-cat').value.trim(),
+    quantidade: parseFloat(document.getElementById('i-qt').value)||0,
+    unidade: document.getElementById('i-un').value.trim()||'un',
+    precoUnitario: parseFloat(document.getElementById('i-preco').value)||0,
+    notas: document.getElementById('i-notas').value.trim(),
+  };
+  if(!data.nome){ alert('Nome é obrigatório'); return; }
+  if(id){
+    const i = state.inventory.findIndex(x=>x.id===id);
+    state.inventory[i] = {...state.inventory[i], ...data};
+  } else {
+    state.inventory.push({id:uid(), ...data});
+  }
+  await save('inventory'); closeModal(); renderView();
+}
+function deleteItem(id){
+  confirmAction('Eliminar este artigo do inventário?', async () => {
+    state.inventory = state.inventory.filter(x=>x.id!==id);
+    await save('inventory'); closeModal(); renderView();
+  });
+}
+
+// ============ EQUIPAMENTOS & LICENÇAS ============
+function viewEquipamentos(){
+  return `
+  <div class="flex items-center justify-between mb-6">
+    <div><h2 class="text-2xl font-bold">Equipamentos & Licenças</h2><p class="text-sm" style="color:var(--muted);">${state.equipment.length} equipamento(s) · lembretes 30 dias antes de expirar</p></div>
+    <button class="btn btn-accent" onclick="editEquip()">+ Novo Equipamento</button>
+  </div>
+  ${state.equipment.length===0
+    ? `<div class="card empty"><div class="empty-icon">🔧</div>Sem equipamentos registados.</div>`
+    : state.equipment.map(eq=>{
+        const licsHtml = (eq.licencas||[]).map(l=>{
+          if(!l.dataFim) return `<div class="chip">${escapeHtml(l.nome)} · sem data</div>`;
+          const d = daysBetween(today(), l.dataFim);
+          let cls='badge-ok', txt=`${d} dias restantes`;
+          if(d<0){cls='badge-danger';txt=`Expirou há ${Math.abs(d)} dias`;}
+          else if(d<=30){cls='badge-warn';txt=d===0?'Expira hoje':`${d} dias restantes ⚠`;}
+          return `<div class="chip">${escapeHtml(l.nome)} · ${fmtDate(l.dataFim)} <span class="badge ${cls}" style="margin-left:4px;">${txt}</span></div>`;
+        }).join(' ');
+        return `<div class="card p-5 mb-3">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="flex-1">
+              <div class="font-semibold text-lg">${escapeHtml(eq.nome)}</div>
+              <div class="text-sm mt-1" style="color:var(--muted);">
+                ${eq.tipo?escapeHtml(eq.tipo):''}${eq.numeroSerie?' · S/N '+escapeHtml(eq.numeroSerie):''}${eq.dataCompra?' · Comprado em '+fmtDate(eq.dataCompra):''}
+              </div>
+              ${eq.localizacao?`<div class="text-sm mt-1">📍 ${escapeHtml(eq.localizacao)}</div>`:''}
+              <div class="mt-3 flex gap-2 flex-wrap">${licsHtml || '<span class="text-sm" style="color:var(--muted);">Sem licenças registadas</span>'}</div>
+              ${eq.notas?`<div class="text-sm mt-2" style="color:var(--ink-soft);">${escapeHtml(eq.notas)}</div>`:''}
+            </div>
+            <div class="flex flex-col gap-2">
+              <button class="btn btn-ghost" onclick="editEquip('${eq.id}')">Editar</button>
+              <button class="btn btn-danger" onclick="deleteEquip('${eq.id}')" title="Eliminar">🗑 Eliminar</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+  }`;
+}
+function editEquip(id){
+  const eq = id ? JSON.parse(JSON.stringify(state.equipment.find(x=>x.id===id))) : {nome:'',tipo:'',numeroSerie:'',dataCompra:'',localizacao:'',notas:'',licencas:[]};
+  window._editingEquip = eq;
+  _renderEquipModal();
+}
+function _renderEquipModal(){
+  const eq = window._editingEquip;
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${eq.id?'Editar':'Novo'} Equipamento</h2>
+      <div class="grid-2">
+        <div><label class="label">Nome *</label><input class="input" id="e-nome" value="${escapeAttr(eq.nome)}"></div>
+        <div><label class="label">Tipo</label><input class="input" id="e-tipo" value="${escapeAttr(eq.tipo||'')}" placeholder="ex: Analisador, Certificador"></div>
+        <div><label class="label">Nº de Série</label><input class="input" id="e-sn" value="${escapeAttr(eq.numeroSerie||'')}"></div>
+        <div><label class="label">Data de Compra</label><input class="input" type="date" id="e-dc" value="${eq.dataCompra||''}"></div>
+        <div><label class="label">Localização</label><input class="input" id="e-loc" value="${escapeAttr(eq.localizacao||'')}" placeholder="onde está guardado"></div>
+      </div>
+      <div class="mt-3"><label class="label">Notas</label><textarea class="input" id="e-notas" rows="2">${escapeHtml(eq.notas||'')}</textarea></div>
+
+      <h3 class="serif text-lg font-bold mt-6 mb-3">Licenças / Calibrações</h3>
+      <div id="lics-list">
+        ${(eq.licencas||[]).map((l,i)=>`
+          <div class="mb-2 items-end" style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;">
+            <div><label class="label">Nome</label><input class="input" data-l="nome" data-i="${i}" value="${escapeAttr(l.nome||'')}" placeholder="ex: Calibração, Licença SW"></div>
+            <div><label class="label">Data Início</label><input class="input" type="date" data-l="ini" data-i="${i}" value="${l.dataInicio||''}"></div>
+            <div><label class="label">Data Fim</label><input class="input" type="date" data-l="fim" data-i="${i}" value="${l.dataFim||''}"></div>
+            <button class="btn btn-danger" onclick="removeLic(${i})">✕</button>
+          </div>
+        `).join('') || '<div class="text-sm" style="color:var(--muted);">Sem licenças. Clique abaixo para adicionar.</div>'}
+      </div>
+      <button class="btn btn-ghost mt-2" onclick="addLic()">+ Adicionar Licença</button>
+
+      <h3 class="serif text-lg font-bold mt-6 mb-3">📎 Documentos do Equipamento</h3>
+      <div class="text-xs mb-2" style="color:var(--muted);">Certificados de calibração, manuais, licenças de software. Estes ficheiros são incluídos automaticamente no ZIP de qualquer obra onde este equipamento for usado.</div>
+      <div class="section-box">
+        ${renderDropZone('dz-equip', 'Documentos permanentes', eq.ficheiros||[])}
+      </div>
+
+      <div class="flex justify-between mt-6">
+        ${eq.id?`<button class="btn btn-danger" onclick="deleteEquip('${eq.id}')">Eliminar</button>`:'<div></div>'}
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveEquip()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+  setTimeout(() => {
+    if(!eq.ficheiros) eq.ficheiros = [];
+    attachDropZone('dz-equip', eq.ficheiros, () => { syncEquipFromForm(); _renderEquipModal(); });
+  }, 0);
+}
+function syncEquipFromForm(){
+  const eq = window._editingEquip;
+  eq.nome = document.getElementById('e-nome').value.trim();
+  eq.tipo = document.getElementById('e-tipo').value.trim();
+  eq.numeroSerie = document.getElementById('e-sn').value.trim();
+  eq.dataCompra = document.getElementById('e-dc').value;
+  eq.localizacao = document.getElementById('e-loc').value.trim();
+  eq.notas = document.getElementById('e-notas').value.trim();
+  eq.licencas = eq.licencas || [];
+  document.querySelectorAll('[data-l]').forEach(el=>{
+    const i=+el.dataset.i, k=el.dataset.l;
+    if(!eq.licencas[i]) eq.licencas[i]={nome:'',dataInicio:'',dataFim:''};
+    if(k==='nome') eq.licencas[i].nome=el.value;
+    if(k==='ini') eq.licencas[i].dataInicio=el.value;
+    if(k==='fim') eq.licencas[i].dataFim=el.value;
+  });
+}
+function addLic(){ syncEquipFromForm(); window._editingEquip.licencas.push({nome:'',dataInicio:'',dataFim:''}); _renderEquipModal(); }
+function removeLic(i){ syncEquipFromForm(); window._editingEquip.licencas.splice(i,1); _renderEquipModal(); }
+async function saveEquip(){
+  syncEquipFromForm();
+  const eq = window._editingEquip;
+  if(!eq.nome){ alert('Nome é obrigatório'); return; }
+  if(eq.id){
+    const i = state.equipment.findIndex(x=>x.id===eq.id);
+    state.equipment[i] = eq;
+  } else {
+    eq.id = uid();
+    state.equipment.push(eq);
+  }
+  await save('equipment'); closeModal(); renderView();
+}
+function deleteEquip(id){
+  confirmAction('Eliminar este equipamento e todas as suas licenças?', async () => {
+    state.equipment = state.equipment.filter(x=>x.id!==id);
+    await save('equipment'); closeModal(); renderView();
+  });
+}
+
+// ============ MODAL ============
+function openModal(html){
+  let m = document.getElementById('modal');
+  if(!m){
+    m = document.createElement('div');
+    m.id = 'modal';
+    m.className = 'modal-bg';
+    m.addEventListener('click', e=>{ if(e.target===m) closeModal(); });
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `<div class="modal" onclick="event.stopPropagation()">${html}</div>`;
+  m.style.display = 'flex';
+}
+function closeModal(){
+  const m = document.getElementById('modal');
+  if(m) m.style.display='none';
+  renderView();
+}
+
+// Custom confirmation modal (replaces native confirm() which can be blocked in embedded environments)
+function confirmAction(message, onConfirm, opts){
+  opts = opts || {};
+  const okLabel = opts.okLabel || 'Eliminar';
+  const cancelLabel = opts.cancelLabel || 'Cancelar';
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg';
+  wrap.style.zIndex = '70';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:440px;" onclick="event.stopPropagation()">
+      <div class="p-6">
+        <h3 class="text-xl font-bold mb-3">Confirmar</h3>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);line-height:1.5;">${escapeHtml(message)}</p>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-ghost" data-act="cancel">${escapeHtml(cancelLabel)}</button>
+          <button class="btn" data-act="ok" style="background:var(--danger);color:#fff;">${escapeHtml(okLabel)}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector('[data-act="cancel"]').onclick = close;
+  wrap.querySelector('[data-act="ok"]').onclick = () => { close(); try { onConfirm(); } catch(e){ alert('Erro: '+e.message); } };
+  wrap.addEventListener('click', e => { if(e.target === wrap) close(); });
+}
+
+// ============ UTILS ============
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+// Returns the Trited logo src (reads from the header img to avoid duplicating base64)
+function getLogoSrc(){
+  const img = document.querySelector('.brand-img');
+  return img ? img.src : '';
+}
+
+// ============ FILE STORAGE ============
+const fmtSize = (b) => b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+
+async function storeFile(file){
+  if(file.size > 4500000){ throw new Error('Ficheiro "'+file.name+'" excede 4.5 MB.'); }
+  const dataUrl = await new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('Erro a ler ficheiro'));
+    r.readAsDataURL(file);
+  });
+  const id = uid();
+  const key = 'file:'+id;
+  await window.storage.set(key, dataUrl);
+  return { id, key, name: file.name, size: file.size, type: file.type || 'application/octet-stream' };
+}
+
+async function readFile(key){
+  try { const r = await window.storage.get(key); return r ? r.value : null; }
+  catch(e){ return null; }
+}
+
+async function deleteStoredFile(key){
+  try { await window.storage.delete(key); } catch(e){}
+}
+
+function dataUrlToBlob(dataUrl){
+  const [meta, b64] = dataUrl.split(',');
+  const mime = (meta.match(/:(.*?);/)||[])[1] || 'application/octet-stream';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type: mime});
+}
+
+async function downloadStoredFile(fmeta){
+  const dataUrl = await readFile(fmeta.key);
+  if(!dataUrl){ alert('Ficheiro não encontrado'); return; }
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = fmeta.name;
+  a.click();
+}
+
+// Generic dropzone renderer used by obra and equip modals
+// target = {obj, listKey}  obj is the in-memory object being edited, listKey is the array prop
+function renderDropZone(zoneId, label, listArr, onChange){
+  return `
+    <div class="dropzone" id="${zoneId}" onclick="document.getElementById('${zoneId}-input').click()">
+      <input type="file" id="${zoneId}-input" multiple style="display:none" onchange="window['${zoneId}_handle'](this.files)">
+      <div class="dropzone-icon">📎</div>
+      <div class="dropzone-text"><strong>${label}</strong> · clique ou arraste ficheiros aqui</div>
+      <div class="dropzone-text" style="font-size:11px;margin-top:2px;">máx. 4.5 MB por ficheiro</div>
+    </div>
+    <div id="${zoneId}-list">
+      ${(listArr||[]).map((f,i)=>`
+        <div class="file-item">
+          <span style="font-size:16px;">${f.type && f.type.startsWith('image/') ? '🖼️' : '📄'}</span>
+          <span class="file-name" onclick="downloadStoredFile(${JSON.stringify(f).replace(/"/g,'&quot;')})" style="cursor:pointer;text-decoration:underline;">${escapeHtml(f.name)}</span>
+          <span class="file-size">${fmtSize(f.size)}</span>
+          <button class="icon-btn" onclick="window['${zoneId}_remove'](${i})" title="Remover">✕</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function attachDropZone(zoneId, listArr, onUpdate){
+  const zone = document.getElementById(zoneId);
+  if(!zone) return;
+  const handle = async (files) => {
+    for(const f of files){
+      try {
+        const meta = await storeFile(f);
+        listArr.push(meta);
+      } catch(e){ alert(e.message); }
+    }
+    onUpdate();
+  };
+  window[zoneId+'_handle'] = handle;
+  window[zoneId+'_remove'] = async (i) => {
+    const f = listArr[i];
+    if(f && f.key) await deleteStoredFile(f.key);
+    listArr.splice(i,1);
+    onUpdate();
+  };
+  ['dragenter','dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('over'); }));
+  zone.addEventListener('drop', e => { if(e.dataTransfer.files.length) handle(e.dataTransfer.files); });
+}
+
+// ============ INIT ============
+(async function init(){
+  await loadAll();
+  renderTabs();
+  renderView();
+})();
+</script>
