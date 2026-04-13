@@ -455,6 +455,78 @@ function clientStatus(clienteId){
 }
 
 // ============ PAINEL ============
+function renderMonthlyChart(){
+  // Últimos 12 meses: faturado (valor de obras criadas) + recebido (valorPago)
+  const now = new Date();
+  const months = [];
+  for(let i = 11; i >= 0; i--){
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'),
+      label: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][d.getMonth()],
+      ano: d.getFullYear(),
+      faturado: 0, recebido: 0
+    });
+  }
+  const mIdx = k => months.findIndex(m => m.key === k);
+  state.obras.forEach(o => {
+    const valor = Number(o.valor || 0);
+    const pago = Number(o.valorPago || 0);
+    if(valor > 0 && o.data){
+      const k = o.data.slice(0,7); // YYYY-MM
+      const i = mIdx(k);
+      if(i >= 0) months[i].faturado += valor;
+    }
+    if(pago > 0 && o.dataPagamento){
+      const k = o.dataPagamento.slice(0,7);
+      const i = mIdx(k);
+      if(i >= 0) months[i].recebido += pago;
+    } else if(pago > 0 && o.data){
+      // fallback: usa data da obra se não houver dataPagamento
+      const k = o.data.slice(0,7);
+      const i = mIdx(k);
+      if(i >= 0) months[i].recebido += pago;
+    }
+  });
+  const maxVal = Math.max(1, ...months.map(m => Math.max(m.faturado, m.recebido)));
+  const hasAny = months.some(m => m.faturado > 0 || m.recebido > 0);
+  const totalFaturado = months.reduce((a,m) => a + m.faturado, 0);
+  const totalRecebido = months.reduce((a,m) => a + m.recebido, 0);
+
+  const bars = months.map((m, idx) => {
+    const hFat = Math.round((m.faturado / maxVal) * 140);
+    const hRec = Math.round((m.recebido / maxVal) * 140);
+    const currentMonth = idx === months.length - 1;
+    const title = `${m.label} ${m.ano}\nFaturado: ${fmt(m.faturado)}\nRecebido: ${fmt(m.recebido)}`;
+    return `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;" title="${title}">
+        <div style="height:150px;display:flex;align-items:flex-end;gap:3px;width:100%;justify-content:center;">
+          <div style="width:12px;height:${Math.max(hFat,1)}px;background:var(--accent-grad);border-radius:3px 3px 0 0;opacity:${m.faturado>0?1:0.15};transition:height .3s;"></div>
+          <div style="width:12px;height:${Math.max(hRec,1)}px;background:var(--blue-grad);border-radius:3px 3px 0 0;opacity:${m.recebido>0?1:0.15};transition:height .3s;"></div>
+        </div>
+        <div style="font-size:11px;color:${currentMonth?'var(--ink)':'var(--muted)'};font-weight:${currentMonth?'700':'500'};white-space:nowrap;">${m.label}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+  <div class="card p-5 mb-6">
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <h2 class="text-xl font-bold">📊 Faturação dos Últimos 12 Meses</h2>
+      <div class="text-xs" style="color:var(--muted);">Passe o rato sobre cada barra para ver valores exatos</div>
+    </div>
+    <div class="flex gap-4 mb-4 flex-wrap" style="font-size:12px;">
+      <div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:var(--accent-grad);border-radius:3px;display:inline-block;"></span> <span style="color:var(--ink-soft);">Faturado: <strong style="color:var(--accent);">${fmt(totalFaturado)}</strong></span></div>
+      <div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:var(--blue-grad);border-radius:3px;display:inline-block;"></span> <span style="color:var(--ink-soft);">Recebido: <strong style="color:var(--blue);">${fmt(totalRecebido)}</strong></span></div>
+    </div>
+    ${hasAny
+      ? `<div style="display:flex;align-items:flex-end;gap:8px;padding:10px 0;">${bars}</div>`
+      : `<div class="empty" style="padding:30px 20px;"><div class="empty-icon">📊</div>Sem dados de faturação nos últimos 12 meses.<br><span style="font-size:12px;">Crie obras com valor e data para ver o gráfico.</span></div>`
+    }
+  </div>
+  `;
+}
+
 function viewPainel(){
   let totalDivida = 0, totalRecebido = 0;
   state.obras.forEach(o => {
@@ -551,6 +623,8 @@ function viewPainel(){
       }
     </div>
   </div>
+
+  ${renderMonthlyChart()}
 
   <div class="card p-5">
     <div class="flex items-center justify-between mb-4">
@@ -775,7 +849,14 @@ function openObra(id){
           ${o.estado !== 'concluida' ? `<button class="btn btn-ok" onclick="setObraEstado('${o.id}','concluida')" title="Marcar como concluída">✓ Concluir</button>` : `<button class="btn btn-ghost" onclick="setObraEstado('${o.id}','em_curso')" title="Reabrir obra">↻ Reabrir</button>`}
           <button class="btn btn-accent" onclick="exportObraZIP('${o.id}')">📦 Exportar ZIP</button>
           <button class="btn btn-ghost" onclick="editObra('${o.id}')">Editar</button>
-          <button class="btn btn-danger" onclick="deleteObra('${o.id}')">Eliminar</button>
+          <div style="position:relative;display:inline-block;">
+            <button class="btn btn-ghost" onclick="toggleObraMenu('${o.id}')" title="Mais opções">⋯</button>
+            <div id="obra-menu-${o.id}" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);min-width:200px;z-index:50;overflow:hidden;">
+              <button onclick="document.getElementById('obra-menu-${o.id}').style.display='none';duplicarObra('${o.id}')" style="width:100%;text-align:left;padding:11px 14px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--ink);font-size:14px;" onmouseover="this.style.background='var(--line-soft)'" onmouseout="this.style.background=''">📋 <span>Duplicar obra</span></button>
+              <div style="height:1px;background:var(--line-soft);"></div>
+              <button onclick="document.getElementById('obra-menu-${o.id}').style.display='none';deleteObra('${o.id}')" style="width:100%;text-align:left;padding:11px 14px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--danger);font-size:14px;" onmouseover="this.style.background='var(--danger-soft)'" onmouseout="this.style.background=''">🗑 <span>Eliminar obra</span></button>
+            </div>
+          </div>
           <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
         </div>
       </div>
@@ -846,6 +927,61 @@ function openObra(id){
 }
 
 // ============ REGISTAR PAGAMENTO (parcial ou total) ============
+function toggleObraMenu(id){
+  const el = document.getElementById('obra-menu-' + id);
+  if(!el) return;
+  const isOpen = el.style.display === 'block';
+  document.querySelectorAll('[id^="obra-menu-"]').forEach(m => m.style.display = 'none');
+  el.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    setTimeout(() => {
+      document.addEventListener('click', function closeOnce(e){
+        if(!e.target.closest('#obra-menu-' + id) && !e.target.closest('[onclick*="toggleObraMenu"]')){
+          el.style.display = 'none';
+          document.removeEventListener('click', closeOnce);
+        }
+      });
+    }, 50);
+  }
+}
+
+async function duplicarObra(id){
+  const orig = state.obras.find(x => x.id === id);
+  if(!orig) return;
+  const ano = currentYear();
+  const nova = {
+    id: uid(),
+    numero: nextObraNumForYear(ano),
+    ano,
+    clienteId: orig.clienteId || '',
+    data: today(),
+    dataConclusao: '',
+    descricao: 'CÓPIA - ' + (orig.descricao || ''),
+    observacoes: '',
+    valor: 0, valorPago: 0, dataPagamento: '',
+    estado: 'em_curso',
+    incluiFichaIted: !!orig.incluiFichaIted,
+    incluiFichaItur: !!orig.incluiFichaItur,
+    refId: '',
+    instalador: orig.instalador ? {...orig.instalador} : {nome:'',nif:'',numero:''},
+    itur: {
+      morada: '', codPostal: '', localidade: '', coordenadas: '',
+      manualIted: (orig.itur && orig.itur.manualIted) || ''
+    },
+    cabos: (orig.cabos || []).map(c => ({...c})),
+    materiais: (orig.materiais || []).map(m => ({...m})),
+    docObrig: orig.docObrig ? {...orig.docObrig} : {ensaios:false,calibracao:false,projeto:false},
+    docFacult: orig.docFacult || '',
+    equipamentosUsados: [...(orig.equipamentosUsados || [])],
+    ficheiros: {cobre:[], coaxial:[], fibra:[], fotos:[], outros:[]},
+    _duplicadaDe: orig.id
+  };
+  state.obras.push(nova);
+  await save('obras');
+  closeModal(true);
+  editObra(nova.id);
+}
+
 async function setObraEstado(id, novoEstado){
   const o = state.obras.find(x=>x.id===id);
   if(!o) return;
@@ -1216,6 +1352,7 @@ function refreshCatalogRowStatus(){
 
 function syncObraFromForm(){
   const o = window._editingObra;
+  if(!o) return;
   const val = id => { const el=document.getElementById(id); return el?el.value:''; };
   const chk = id => { const el=document.getElementById(id); return el?el.checked:false; };
   o.numero = parseInt(val('o-numero'))||o.numero;
@@ -1228,17 +1365,32 @@ function syncObraFromForm(){
   o.valor = parseFloat(val('o-valor'))||0;
   o.valorPago = parseFloat(val('o-valorpago'))||0;
   o.dataPagamento = val('o-datapago');
-  o.incluiFichaIted = chk('o-incluiIted');
-  if(o.incluiFichaIted){
-    o.refId = val('o-refid');
-    o.instalador.nome = val('o-inst-nome');
-    o.instalador.nif = val('o-inst-nif');
-    o.instalador.numero = val('o-inst-num');
-    o.itur.morada = val('o-itur-morada');
-    o.itur.codPostal = val('o-itur-cp');
-    o.itur.localidade = val('o-itur-loc');
-    o.itur.coordenadas = val('o-itur-coord');
-    o.itur.manualIted = val('o-itur-manual');
+  // Checkbox Ficha ITED — compatível com versões antigas
+  const itedCheckbox = document.getElementById('o-incluiIted');
+  if(itedCheckbox) o.incluiFichaIted = itedCheckbox.checked;
+  if(o.incluiFichaIted || o.incluiFichaItur){
+    // Inicialização defensiva para obras antigas que não tinham ficha
+    if(!o.instalador) o.instalador = {nome:'',nif:'',numero:''};
+    if(!o.itur) o.itur = {morada:'',codPostal:'',localidade:'',coordenadas:'',manualIted:''};
+    if(!Array.isArray(o.cabos)) o.cabos = [];
+    if(!Array.isArray(o.materiais)) o.materiais = [];
+    if(!o.docObrig) o.docObrig = {ensaios:false,calibracao:false,projeto:false};
+    if(o.docFacult === undefined) o.docFacult = '';
+    if(o.refId === undefined) o.refId = '';
+
+    o.refId = val('o-refid') || o.refId;
+    if(document.getElementById('o-inst-nome')){
+      o.instalador.nome = val('o-inst-nome');
+      o.instalador.nif = val('o-inst-nif');
+      o.instalador.numero = val('o-inst-num');
+    }
+    if(document.getElementById('o-itur-morada')){
+      o.itur.morada = val('o-itur-morada');
+      o.itur.codPostal = val('o-itur-cp');
+      o.itur.localidade = val('o-itur-loc');
+      o.itur.coordenadas = val('o-itur-coord');
+      o.itur.manualIted = val('o-itur-manual');
+    }
     document.querySelectorAll('[data-c]').forEach(el=>{
       const i=+el.dataset.i, k=el.dataset.c;
       if(!o.cabos[i]) o.cabos[i]={tecnologia:'',marca:'',classe:'',ref:''};
@@ -1254,10 +1406,12 @@ function syncObraFromForm(){
       if(k==='marca') o.materiais[i].marca=el.value;
       if(k==='ref') o.materiais[i].ref=el.value;
     });
-    o.docObrig.ensaios = chk('o-doc-ensaios');
-    o.docObrig.calibracao = chk('o-doc-calibracao');
-    o.docObrig.projeto = chk('o-doc-projeto');
-    o.docFacult = val('o-doc-facult');
+    if(document.getElementById('o-doc-ensaios')){
+      o.docObrig.ensaios = chk('o-doc-ensaios');
+      o.docObrig.calibracao = chk('o-doc-calibracao');
+      o.docObrig.projeto = chk('o-doc-projeto');
+      o.docFacult = val('o-doc-facult');
+    }
   }
 }
 
@@ -1498,29 +1652,39 @@ function showCatalogSyncDialog(diff, onDone){
 }
 
 async function saveObra(){
-  syncObraFromForm();
-  const data = window._editingObra;
-  const id = window._editingObraId;
-  if(!data.descricao){ alert('A descrição é obrigatória'); return; }
-  let finalId = id;
-  if(id){
-    const i = state.obras.findIndex(o=>o.id===id);
-    state.obras[i] = {...data, id};
-  } else {
-    finalId = uid();
-    state.obras.push({...data, id:finalId});
-  }
-  await save('obras');
-
-  // Verificar catálogo só se a obra tiver Ficha ITED
-  if(data.incluiFichaIted){
-    const diff = obraCatalogDiff(data);
-    if(diff.novos.length > 0 || diff.alterados.length > 0){
-      showCatalogSyncDialog(diff, () => openObra(finalId));
-      return;
+  try {
+    syncObraFromForm();
+    const data = window._editingObra;
+    const id = window._editingObraId;
+    // Descrição não é obrigatória — permite guardar como rascunho
+    if(!data.descricao || !data.descricao.trim()){
+      data.descricao = '(Rascunho — sem descrição)';
     }
+    let finalId = id;
+    if(id){
+      const i = state.obras.findIndex(o=>o.id===id);
+      if(i >= 0) state.obras[i] = {...data, id};
+      else state.obras.push({...data, id});
+    } else {
+      finalId = uid();
+      state.obras.push({...data, id:finalId});
+    }
+    await save('obras');
+    if(typeof clearDirty === 'function') clearDirty();
+
+    // Verificar catálogo se a obra tiver ITED ou ITUR
+    if(data.incluiFichaIted || data.incluiFichaItur){
+      const diff = obraCatalogDiff(data);
+      if(diff.novos.length > 0 || diff.alterados.length > 0){
+        showCatalogSyncDialog(diff, () => openObra(finalId));
+        return;
+      }
+    }
+    openObra(finalId);
+  } catch(e){
+    alert('Erro ao guardar a obra: ' + e.message + '\n\nAbra F12 → Console para ver o erro completo.');
+    console.error('saveObra failed:', e);
   }
-  openObra(finalId);
 }
 
 function deleteObra(id){
