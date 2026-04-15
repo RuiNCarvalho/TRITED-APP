@@ -926,12 +926,8 @@ function openObra(id){
         <div style="white-space:pre-wrap;margin-top:8px;line-height:1.6;">${escapeHtml(o.descricao||'—')}</div>
       </div>
 
-      ${o.observacoes ? `
-        <div class="section-box mb-4">
-          <div class="label">Observações</div>
-          <div style="white-space:pre-wrap;margin-top:8px;line-height:1.6;">${escapeHtml(o.observacoes)}</div>
-        </div>
-      ` : ''}
+      <!-- Secção de Presenças — substitui Observações para ficar bem visível -->
+      ${typeof presencasObraHtml === 'function' ? presencasObraHtml(o.id) : '<div style="color:red;">presencasObraHtml não definida</div>'}
 
       ${(o.incluiFichaIted || o.incluiFichaItur) ? `
         <div class="flex items-center justify-between mt-6 pt-4" style="border-top:1px solid var(--line);">
@@ -942,17 +938,8 @@ function openObra(id){
           <button class="btn btn-primary" onclick="previewObraPDF('${o.id}')">↓ Ver / Exportar PDF</button>
         </div>
       ` : ''}
-
-      <div id="obra-presencas-slot-${o.id}"></div>
     </div>
   `);
-  // Inject presenças section (módulo isolado)
-  setTimeout(() => {
-    const slot = document.getElementById('obra-presencas-slot-' + o.id);
-    if(slot && typeof presencasObraHtml === 'function'){
-      slot.innerHTML = presencasObraHtml(o.id);
-    }
-  }, 0);
 }
 
 // ============ REGISTAR PAGAMENTO (parcial ou total) ============
