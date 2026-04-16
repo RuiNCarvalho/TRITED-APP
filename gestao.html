@@ -1149,6 +1149,8 @@ function editObra(id, preClienteId){
       ficheiros: { cobre:[], coaxial:[], fibra:[], fotos:[], outros:[] }
     };
     window._editingObraId = null;
+    // Pré-gerar id para permitir adicionar presenças antes de guardar
+    window._editingObraPreId = uid();
   }
   _renderObraModal();
 }
@@ -1255,7 +1257,10 @@ function _renderObraModal(){
 
       <div class="mt-3"><label class="label">Descrição do Trabalho Realizado *</label><textarea class="input" id="o-desc" rows="4" placeholder="O que foi feito nesta obra...">${escapeHtml(o.descricao||'')}</textarea></div>
 
-      <div class="mt-3"><label class="label">Observações</label><textarea class="input" id="o-obs" rows="2" placeholder="Notas internas, detalhes adicionais...">${escapeHtml(o.observacoes||'')}</textarea></div>
+      <div class="mt-4" id="o-presencas-container">${(() => {
+        const oid = window._editingObraId || window._editingObraPreId;
+        return (typeof presencasObraHtml === 'function' && oid) ? presencasObraHtml(oid) : '<div class="card p-4" style="color:var(--muted);font-size:13px;"><strong>👷 Presenças</strong><br>Ainda não é possível registar presenças.</div>';
+      })()}</div>
 
       <div class="grid-2 mt-3">
         <div><label class="label">Valor Já Pago (€)</label><input class="input" type="number" step="0.01" id="o-valorpago" value="${o.valorPago||0}"></div>
@@ -1483,7 +1488,9 @@ function syncObraFromForm(){
   o.dataConclusao = val('o-dataconc');
   o.estado = val('o-estado')||'em_curso';
   o.descricao = val('o-desc');
-  o.observacoes = val('o-obs');
+  // Observações: campo removido do formulário mas mantemos valor antigo se existia
+  const obsEl = document.getElementById('o-obs');
+  if(obsEl) o.observacoes = obsEl.value;
   o.valor = parseFloat(val('o-valor'))||0;
   o.valorPago = parseFloat(val('o-valorpago'))||0;
   o.dataPagamento = val('o-datapago');
@@ -1788,8 +1795,9 @@ async function saveObra(){
       if(i >= 0) state.obras[i] = {...data, id};
       else state.obras.push({...data, id});
     } else {
-      finalId = uid();
+      finalId = window._editingObraPreId || uid();
       state.obras.push({...data, id:finalId});
+      window._editingObraPreId = null;
     }
     await save('obras');
     if(typeof clearDirty === 'function') clearDirty();
@@ -2918,10 +2926,14 @@ function presencasObraHtml(obraId){
     ${semWorkers
       ? `<div class="text-xs" style="color:var(--muted);">Crie trabalhadores no separador "Trabalhadores" para começar a registar presenças.</div>`
       : `
-        <div class="flex gap-2 mb-3 flex-wrap items-center">
-          <select class="select" id="pres-add-${obraId}" style="flex:1;min-width:200px;" onchange="adicionarPresenca('${obraId}', this.value, '${hoje}')">
-            ${addOpts}
-          </select>
+        <div class="flex gap-2 mb-3 flex-wrap items-start">
+          <div style="flex:1;min-width:200px;position:relative;">
+            <input type="text" class="input" id="pres-search-${obraId}" placeholder="🔍 Procurar trabalhador por nome..." autocomplete="off"
+              oninput="onPresencaSearch('${obraId}')"
+              onfocus="onPresencaSearch('${obraId}')"
+              onblur="setTimeout(() => hidePresencaSuggest('${obraId}'), 180)">
+            <div id="pres-suggest-${obraId}" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);z-index:40;max-height:260px;overflow-y:auto;display:none;margin-top:4px;"></div>
+          </div>
           <input type="date" class="input" id="pres-data-${obraId}" value="${hoje}" style="max-width:170px;" title="Data da presença">
         </div>
         ${histHtml}
@@ -2929,6 +2941,82 @@ function presencasObraHtml(obraId){
     }
   </div>
   `;
+}
+
+function onPresencaSearch(obraId){
+  const inp = document.getElementById('pres-search-' + obraId);
+  const box = document.getElementById('pres-suggest-' + obraId);
+  if(!inp || !box) return;
+  const q = inp.value.trim().toLowerCase();
+  const dataEl = document.getElementById('pres-data-' + obraId);
+  const data = dataEl ? dataEl.value : today();
+  // Lista de trabalhadores disponíveis (excluindo os já marcados nessa data nessa obra)
+  const disponiveis = state.workers.filter(w => {
+    return !state.presencas.some(p => p.obraId === obraId && p.data === data && p.workerId === w.id);
+  });
+  // Filtrar: se tem query, procurar substring case-insensitive; senão mostrar todos
+  let list = disponiveis;
+  if(q){
+    list = disponiveis.filter(w => w.nome.toLowerCase().includes(q));
+  }
+  list = list.slice(0, 10);
+  if(list.length === 0){
+    box.innerHTML = `<div style="padding:12px 14px;color:var(--muted);font-size:13px;">
+      ${q ? 'Nenhum trabalhador encontrado com "' + escapeHtml(q) + '"' : 'Todos os trabalhadores já estão marcados nesta data.'}
+    </div>`;
+    box.style.display = 'block';
+    return;
+  }
+  // Destacar a parte do nome que corresponde à pesquisa
+  const highlight = (nome) => {
+    if(!q) return escapeHtml(nome);
+    const idx = nome.toLowerCase().indexOf(q);
+    if(idx < 0) return escapeHtml(nome);
+    const before = escapeHtml(nome.substring(0, idx));
+    const match = escapeHtml(nome.substring(idx, idx + q.length));
+    const after = escapeHtml(nome.substring(idx + q.length));
+    return before + '<mark style="background:var(--accent-soft);color:var(--accent);padding:0 2px;border-radius:3px;">' + match + '</mark>' + after;
+  };
+  box.innerHTML = list.map(w => `
+    <div onmousedown="pickPresenca('${obraId}', '${w.id}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='var(--line-soft)'" onmouseout="this.style.background=''">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-weight:700;font-size:12px;">${escapeHtml(w.nome.charAt(0).toUpperCase())}</span>
+      <div style="flex:1;">
+        <div style="font-weight:500;">${highlight(w.nome)}</div>
+        ${w.notas ? `<div style="font-size:11px;color:var(--muted);">${escapeHtml(w.notas)}</div>` : ''}
+      </div>
+      <span style="color:var(--ok);font-size:16px;">+</span>
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function hidePresencaSuggest(obraId){
+  const box = document.getElementById('pres-suggest-' + obraId);
+  if(box) box.style.display = 'none';
+}
+
+async function pickPresenca(obraId, workerId){
+  if(!workerId) return;
+  _ensureWorkersStorage();
+  const dataInput = document.getElementById('pres-data-' + obraId);
+  const data = dataInput ? dataInput.value : today();
+  if(!data){ alert('Indique uma data.'); return; }
+  const exists = state.presencas.find(p => p.obraId === obraId && p.workerId === workerId && p.data === data);
+  if(!exists){
+    state.presencas.push({ id: uid(), obraId, workerId, data });
+    await save('presencas');
+  }
+  hidePresencaSuggest(obraId);
+  // Limpar campo de pesquisa e re-render
+  const inp = document.getElementById('pres-search-' + obraId);
+  if(inp) inp.value = '';
+  // Re-render apenas o container de presenças (está em 2 sítios possíveis)
+  const editContainer = document.getElementById('o-presencas-container');
+  if(editContainer){
+    editContainer.innerHTML = presencasObraHtml(obraId);
+  } else if(typeof openObra === 'function'){
+    openObra(obraId);
+  }
 }
 
 async function adicionarPresenca(obraId, workerId, dataDefault){
