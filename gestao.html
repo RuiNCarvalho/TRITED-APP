@@ -204,6 +204,8 @@
         <p class="brand-sub">Gestão de clientes, obras e equipamentos</p>
       </div>
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <span id="sessionUserPill" class="chip" style="display:none;white-space:nowrap;"></span>
+        <button id="logoutBtn" class="btn btn-ghost" onclick="logout()" style="display:none;">Sair</button>
         <input id="globalSearch" type="search" placeholder="🔍 Pesquisar clientes, obras, catálogo..." oninput="handleGlobalSearch(this.value)" onfocus="handleGlobalSearch(this.value)" style="width:340px;max-width:50vw;" class="input">
         <button id="themeBtn" class="theme-toggle" onclick="toggleTheme()" title="Modo noturno">🌙</button>
         <div id="searchResults" style="position:absolute;top:100%;right:0;width:420px;max-width:90vw;max-height:500px;overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);z-index:45;display:none;margin-top:6px;"></div>
@@ -244,10 +246,40 @@
 // ╚════════════════════════════════════════════════════════════╝
 
 // ============ 1. STATE & DB ============
-const STORE_KEYS = ['clients','obras','inventory','equipment','catalog','workers','presencas','orcamentos'];
-let state = { clients:[], obras:[], inventory:[], equipment:[], catalog:[], workers:[], presencas:[], orcamentos:[] };
+const STORE_KEYS = ['clients','obras','inventory','equipment','catalog','workers','presencas','orcamentos','users'];
+let state = { clients:[], obras:[], inventory:[], equipment:[], catalog:[], workers:[], presencas:[], orcamentos:[], users:[] };
 let currentTab = 'painel';
 let theme = 'light';
+let currentUser = null;
+
+// Storage fallback: permite usar a app fora do ambiente que injeta window.storage
+(function ensureStorage(){
+  if(window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function'){
+    return;
+  }
+  const mem = {};
+  const prefix = 'trited:';
+  window.storage = {
+    async get(key){
+      try {
+        const v = localStorage.getItem(prefix + key);
+        return v === null ? null : { value: v };
+      } catch(e){
+        return Object.prototype.hasOwnProperty.call(mem, key) ? { value: mem[key] } : null;
+      }
+    },
+    async set(key, value){
+      const v = String(value);
+      try { localStorage.setItem(prefix + key, v); }
+      catch(e){ mem[key] = v; }
+      return { key, value: v };
+    },
+    async delete(key){
+      try { localStorage.removeItem(prefix + key); }
+      catch(e){ delete mem[key]; }
+    }
+  };
+})();
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const fmt = (n) => (Number(n)||0).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
@@ -262,6 +294,159 @@ const obraLabel = (o) => {
   return n + '-' + y;
 };
 const nextObraNumForYear = (ano) => (state.obras.filter(o=>Number(o.ano)===Number(ano)).reduce((m,o)=>Math.max(m, Number(o.numero)||0), 0)) + 1;
+
+
+// ============ 1b. LOGIN / UTILIZADORES ============
+const ROLE_LABELS = {
+  admin_escritorio: 'Administrador / Escritório',
+  trabalhador: 'Trabalhador'
+};
+const ROLE_TABS = {
+  admin_escritorio: ['painel','clientes','obras','catalogo','orcamentos','inventario','equipamentos','trabalhadores','utilizadores'],
+  trabalhador: ['painel','obras','catalogo','trabalhadores']
+};
+
+function normalizeUsername(v){ return String(v||'').trim().toLowerCase(); }
+function canManageUsers(){ return currentUser && currentUser.role === 'admin_escritorio'; }
+function canEditCatalog(){ return currentUser && currentUser.role === 'admin_escritorio'; }
+function canAccessTab(tabId){
+  if(!currentUser) return false;
+  const allowed = ROLE_TABS[currentUser.role] || [];
+  return allowed.includes(tabId);
+}
+function safeUser(u){
+  if(!u) return null;
+  return {id:u.id, nome:u.nome, username:u.username, role:u.role, ativo:u.ativo !== false};
+}
+async function hashPassword(password){
+  const text = String(password||'');
+  if(window.crypto && crypto.subtle && window.TextEncoder){
+    const data = new TextEncoder().encode(text);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return 'sha256:' + Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  return 'local:' + btoa(unescape(encodeURIComponent(text)));
+}
+async function ensureDefaultUsers(){
+  let changed = false;
+  if(!Array.isArray(state.users)){ state.users = []; changed = true; }
+  if(state.users.length === 0){
+    state.users.push({
+      id: uid(), nome: 'Administrador', username: 'admin', role: 'admin_escritorio', ativo: true,
+      passwordHash: await hashPassword('admin123'), criadoEm: today()
+    });
+    state.users.push({
+      id: uid(), nome: 'Trabalhador', username: 'trabalhador', role: 'trabalhador', ativo: true,
+      passwordHash: await hashPassword('1234'), criadoEm: today()
+    });
+    changed = true;
+  }
+  for(const u of state.users){
+    if(u.role === 'admin') { u.role = 'admin_escritorio'; changed = true; }
+    if(u.ativo === undefined){ u.ativo = true; changed = true; }
+    if(u.password && !u.passwordHash){
+      u.passwordHash = await hashPassword(u.password);
+      delete u.password;
+      changed = true;
+    }
+  }
+  if(changed) await save('users');
+}
+async function loadSession(){
+  try {
+    const r = await window.storage.get('session');
+    if(!r || !r.value) return null;
+    const sess = JSON.parse(r.value);
+    const u = state.users.find(x => x.id === sess.userId && x.ativo !== false);
+    return safeUser(u);
+  } catch(e){ return null; }
+}
+async function saveSession(user){
+  await window.storage.set('session', JSON.stringify({userId:user.id, at:new Date().toISOString()}));
+}
+async function logout(){
+  try { await window.storage.delete('session'); } catch(e){}
+  currentUser = null;
+  currentTab = 'painel';
+  closeModal(true);
+  renderAuthGate();
+}
+function updateSessionHeader(){
+  const pill = document.getElementById('sessionUserPill');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const search = document.getElementById('globalSearch');
+  const results = document.getElementById('searchResults');
+  if(!pill || !logoutBtn) return;
+  if(currentUser){
+    pill.style.display = 'inline-flex';
+    logoutBtn.style.display = 'inline-flex';
+    pill.innerHTML = '👤 ' + escapeHtml(currentUser.nome || currentUser.username) + ' · ' + escapeHtml(ROLE_LABELS[currentUser.role] || currentUser.role);
+    if(search){
+      const worker = currentUser.role === 'trabalhador';
+      search.style.display = worker ? 'none' : '';
+      if(worker) search.value = '';
+    }
+    if(results && currentUser.role === 'trabalhador') results.style.display = 'none';
+  } else {
+    pill.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    if(search) search.style.display = '';
+  }
+}
+function renderAuthGate(){
+  const app = document.getElementById('app');
+  const existing = document.getElementById('loginScreen');
+  if(currentUser){
+    if(existing) existing.remove();
+    if(app) app.style.display = '';
+    updateSessionHeader();
+    renderTabs();
+    renderView();
+    return;
+  }
+  if(app) app.style.display = 'none';
+  if(existing) existing.remove();
+  const box = document.createElement('div');
+  box.id = 'loginScreen';
+  box.className = 'min-h-screen';
+  box.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);background-image:var(--bg-grad);';
+  box.innerHTML = `
+    <div class="card" style="width:100%;max-width:430px;padding:28px;">
+      <div class="brand" style="justify-content:center;margin-bottom:14px;">
+        <img src="${getLogoSrc()}" alt="TRITED" class="brand-img" style="height:58px;">
+      </div>
+      <h1 class="text-2xl font-bold text-center mb-1">Entrar na Gestão</h1>
+      <p class="text-sm text-center mb-6" style="color:var(--muted);">Acesso para escritório e trabalhadores</p>
+      <div class="mb-3"><label class="label">Utilizador</label><input class="input" id="login-user" autocomplete="username" placeholder="admin"></div>
+      <div class="mb-3"><label class="label">Palavra-passe</label><input class="input" id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()"></div>
+      <div id="login-error" class="text-sm mb-3" style="display:none;color:var(--danger);"></div>
+      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;padding:12px 16px;">Entrar</button>
+      <div class="text-xs mt-5 p-3 rounded" style="background:var(--line-soft);color:var(--ink-soft);line-height:1.5;">
+        Primeiro acesso: <strong>admin</strong> / <strong>admin123</strong><br>
+        Trabalhador: <strong>trabalhador</strong> / <strong>1234</strong><br>
+        Depois cria/edita utilizadores no separador <strong>Utilizadores</strong>.
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+  setTimeout(() => { const inp = document.getElementById('login-user'); if(inp) inp.focus(); }, 0);
+}
+async function doLogin(){
+  const userEl = document.getElementById('login-user');
+  const passEl = document.getElementById('login-pass');
+  const err = document.getElementById('login-error');
+  const username = normalizeUsername(userEl ? userEl.value : '');
+  const password = passEl ? passEl.value : '';
+  if(err){ err.style.display = 'none'; err.textContent = ''; }
+  const u = state.users.find(x => normalizeUsername(x.username) === username && x.ativo !== false);
+  const incomingHash = await hashPassword(password);
+  if(!u || u.passwordHash !== incomingHash){
+    if(err){ err.textContent = 'Utilizador ou palavra-passe inválidos.'; err.style.display = 'block'; }
+    return;
+  }
+  currentUser = safeUser(u);
+  await saveSession(currentUser);
+  renderAuthGate();
+}
 
 function fichaBadges(o){
   const parts = [];
@@ -300,19 +485,157 @@ function obraEstado(obra){
   return map[e] || map.em_curso;
 }
 
+function obraInventarioItems(obra){
+  return Array.isArray(obra && obra.itensInventario) ? obra.itensInventario : [];
+}
+function inventarioById(id){
+  return state.inventory.find(x => x.id === id) || null;
+}
+function inventarioRowLabel(row){
+  const item = inventarioById(row.inventoryId);
+  return item ? item.nome : (row.nome || 'Artigo removido do inventário');
+}
+function inventarioRowUnidade(row){
+  const item = inventarioById(row.inventoryId);
+  return item ? (item.unidade || 'un') : (row.unidade || 'un');
+}
+function inventarioStockBadge(row, obraId){
+  const item = inventarioById(row.inventoryId);
+  const qtd = Number(row.quantidade || 0);
+  if(!item) return '<span class="badge badge-danger">Removido</span>';
+  const disponivel = inventarioDisponivel(item.id, obraId);
+  if(qtd > disponivel) return '<span class="badge badge-warn">Stock insuficiente</span>';
+  return '<span class="badge badge-ok">Stock OK</span>';
+}
+function inventarioReservado(itemId, excludeObraId){
+  return state.obras.reduce((total, obra) => {
+    if(!obra || obra.id === excludeObraId || obra.stockBaixado || !obra.stockReservado) return total;
+    return total + obraInventarioItems(obra).reduce((s,row) => {
+      return row && row.inventoryId === itemId ? s + Number(row.quantidade || 0) : s;
+    }, 0);
+  }, 0);
+}
+function inventarioDisponivel(itemId, excludeObraId){
+  const item = inventarioById(itemId);
+  if(!item) return 0;
+  return Math.max(0, Number(item.quantidade || 0) - inventarioReservado(itemId, excludeObraId));
+}
+function validarReservaStockObra(obra){
+  const items = obraInventarioItems(obra).filter(row => row && row.inventoryId && Number(row.quantidade || 0) > 0);
+  const problemas = [];
+  items.forEach(row => {
+    const item = inventarioById(row.inventoryId);
+    const qtd = Number(row.quantidade || 0);
+    if(!item){
+      problemas.push(`${inventarioRowLabel(row)}: artigo não existe no inventário.`);
+      return;
+    }
+    const disponivel = inventarioDisponivel(item.id, obra.id);
+    if(qtd > disponivel){
+      problemas.push(`${item.nome}: precisa de reservar ${qtd} ${item.unidade || 'un'}, mas só existem ${disponivel} ${item.unidade || 'un'} disponíveis.`);
+    }
+  });
+  return {items, problemas};
+}
+async function aplicarReservaStockObra(id){
+  const obra = state.obras.find(x => x.id === id);
+  if(!obra){ alert('Obra não encontrada.'); return false; }
+  if(obra.stockBaixado){ alert('O stock desta obra já foi baixado.'); return false; }
+  if(obra.stockReservado){ alert('O stock desta obra já está reservado.'); return false; }
+  const check = validarReservaStockObra(obra);
+  if(check.items.length === 0){ alert('Esta obra não tem materiais do inventário associados.'); return false; }
+  if(check.problemas.length > 0){
+    alert('Não foi possível reservar o stock:\n\n' + check.problemas.join('\n'));
+    return false;
+  }
+  obra.stockReservado = true;
+  obra.stockReservadoEm = today();
+  await save('obras');
+  return true;
+}
+function reservarStockObra(id){
+  const obra = state.obras.find(x => x.id === id);
+  if(!obra) return;
+  if(obra.stockBaixado){ alert('O stock desta obra já foi baixado.'); return; }
+  if(obra.stockReservado){ alert('O stock desta obra já está reservado.'); return; }
+  const check = validarReservaStockObra(obra);
+  if(check.items.length === 0){ alert('Esta obra não tem materiais do inventário associados.'); return; }
+  if(check.problemas.length > 0){
+    alert('Antes de reservar, corrija o stock:\n\n' + check.problemas.join('\n'));
+    return;
+  }
+  const resumo = check.items.map(row => {
+    const item = inventarioById(row.inventoryId);
+    return `• ${item.nome}: ${Number(row.quantidade || 0)} ${item.unidade || 'un'}`;
+  }).join('\n');
+  confirmAction(
+    `Reservar stock para a Obra ${obraLabel(obra)}?\n\n${resumo}\n\nA reserva não desconta o inventário; apenas bloqueia estas quantidades como comprometidas.`,
+    async () => { const ok = await aplicarReservaStockObra(id); if(ok) openObra(id); },
+    { okLabel:'📌 Reservar stock', cancelLabel:'Cancelar', okStyle:'background:var(--blue);color:#fff;' }
+  );
+}
+function renderObraInventarioResumo(obra){
+  const rows = obraInventarioItems(obra).filter(r => r && Number(r.quantidade || 0) > 0);
+  if(rows.length === 0) return '';
+  const statusHtml = obra.stockBaixado
+    ? `<span class="badge badge-ok">Stock baixado ${obra.stockBaixadoEm ? '· ' + fmtDate(obra.stockBaixadoEm) : ''}</span>`
+    : (obra.stockReservado
+        ? `<span class="badge badge-blue">Stock reservado ${obra.stockReservadoEm ? '· ' + fmtDate(obra.stockReservadoEm) : ''}</span><button class="btn btn-primary" onclick="baixarStockObra('${obra.id}')">📦 Dar baixa no stock</button>`
+        : `<button class="btn btn-ghost" onclick="reservarStockObra('${obra.id}')">📌 Reservar stock</button><button class="btn btn-primary" onclick="baixarStockObra('${obra.id}')">📦 Dar baixa no stock</button>`
+      );
+  return `
+    <div class="section-box mb-4">
+      <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div class="label">Materiais do Inventário Usados</div>
+          <div class="text-xs" style="color:var(--muted);">${rows.length} artigo(s) associado(s) à obra</div>
+        </div>
+        <div class="flex gap-2 flex-wrap">${statusHtml}</div>
+      </div>
+      <table>
+        <thead><tr><th>Artigo</th><th>Qtd. usada</th><th>Stock atual</th><th>Disponível</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${rows.map(row => {
+            const item = inventarioById(row.inventoryId);
+            const unidade = inventarioRowUnidade(row);
+            const stockTxt = item ? `${Number(item.quantidade || 0)} ${escapeHtml(unidade)}` : '—';
+            const disponivelTxt = item ? `${inventarioDisponivel(item.id, obra.id)} ${escapeHtml(unidade)}` : '—';
+            return `<tr>
+              <td class="font-semibold">${escapeHtml(inventarioRowLabel(row))}</td>
+              <td>${Number(row.quantidade || 0)} ${escapeHtml(unidade)}</td>
+              <td>${stockTxt}</td>
+              <td>${disponivelTxt}</td>
+              <td>${inventarioStockBadge(row, obra.id)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function loadAll(){
+  const loadWarnings = [];
   // Load theme
   try {
     const t = await window.storage.get('theme');
     if(t && t.value) theme = t.value;
-  } catch(e){}
+  } catch(e){
+    loadWarnings.push('Não foi possível carregar o tema: ' + e.message);
+  }
   applyTheme();
 
   for(const k of STORE_KEYS){
     try {
       const r = await window.storage.get('data:'+k);
-      if(r && r.value) state[k] = JSON.parse(r.value);
-    } catch(e){}
+      if(r && r.value){
+        const parsed = JSON.parse(r.value);
+        if(Array.isArray(parsed)) state[k] = parsed;
+        else loadWarnings.push('Dados inválidos em "'+k+'": esperado array.');
+      }
+    } catch(e){
+      loadWarnings.push('Erro ao carregar "'+k+'": ' + e.message);
+    }
   }
 
   // MIGRATE: old pago boolean → valorPago number + add ano field + renumber per year
@@ -325,6 +648,10 @@ async function loadAll(){
     }
     if(!o.estado) { o.estado = 'em_curso'; changed = true; }
     if(o.observacoes === undefined) { o.observacoes = ''; changed = true; }
+    if(!Array.isArray(o.itensInventario)) { o.itensInventario = []; changed = true; }
+    if(o.stockReservado === undefined) { o.stockReservado = false; changed = true; }
+    if(o.stockReservadoEm === undefined) { o.stockReservadoEm = ''; changed = true; }
+    if(o.stockBaixado === undefined) { o.stockBaixado = false; changed = true; }
     if(!o.equipamentosUsados) { o.equipamentosUsados = []; changed = true; }
     if(!o.ficheiros) { o.ficheiros = {cobre:[],coaxial:[],fibra:[],fotos:[],outros:[]}; changed = true; }
     if(o.dataConclusao === undefined) { o.dataConclusao = ''; changed = true; }
@@ -375,7 +702,9 @@ async function loadAll(){
       await window.storage.delete('data:services');
       await save('obras');
     }
-  } catch(e){}
+  } catch(e){
+    loadWarnings.push('Falha na migração de "services": ' + e.message);
+  }
   try {
     const oldO = await window.storage.get('data:ordens');
     if(oldO && oldO.value){
@@ -399,11 +728,35 @@ async function loadAll(){
       await window.storage.delete('data:ordens');
       await save('obras');
     }
-  } catch(e){}
+  } catch(e){
+    loadWarnings.push('Falha na migração de "ordens": ' + e.message);
+  }
+
+  await ensureDefaultUsers();
+
+  if(loadWarnings.length){
+    console.warn('Avisos de carregamento:', loadWarnings);
+    _warn('Atenção: foram detetados problemas de carregamento/migração. Veja a consola (F12) para detalhes.');
+  }
 }
 async function save(key){
   try { await window.storage.set('data:'+key, JSON.stringify(state[key])); return true; }
   catch(e){ alert('Erro ao guardar "'+key+'": '+e.message); throw e; }
+}
+async function saveMany(keys){
+  for(const k of keys) await save(k);
+}
+function flattenObraFileKeys(obra){
+  if(!obra || !obra.ficheiros) return [];
+  const groups = obra.ficheiros;
+  return Object.keys(groups)
+    .flatMap(k => Array.isArray(groups[k]) ? groups[k] : [])
+    .map(f => f && f.key)
+    .filter(Boolean);
+}
+function flattenEquipmentFileKeys(eq){
+  if(!eq || !Array.isArray(eq.ficheiros)) return [];
+  return eq.ficheiros.map(f => f && f.key).filter(Boolean);
 }
 
 // ============ 2. THEME ============
@@ -424,16 +777,21 @@ const TABS = [
   {id:'clientes', label:'Clientes'},
   {id:'obras', label:'Obras'},
   {id:'catalogo', label:'Catálogo'},
+  {id:'orcamentos', label:'📋 Orçamentos'},
   {id:'inventario', label:'Inventário'},
   {id:'equipamentos', label:'Equipamentos'},
   {id:'trabalhadores', label:'👷 Trabalhadores'},
-  {id:'orcamentos', label:'📋 Orçamentos'},
+  {id:'utilizadores', label:'👤 Utilizadores'},
 ];
 function renderTabs(){
   const bar = document.getElementById('tabs');
-  bar.innerHTML = TABS.map(t =>
+  if(!bar) return;
+  const visibleTabs = TABS.filter(t => canAccessTab(t.id));
+  if(!canAccessTab(currentTab)) currentTab = visibleTabs[0]?.id || 'painel';
+  bar.innerHTML = visibleTabs.map(t =>
     `<button class="nav-tab ${currentTab===t.id?'active':''}" onclick="switchTab('${t.id}')">${t.label}</button>`
   ).join('');
+  updateSessionHeader();
   attachTabDrag(bar);
   // Auto-scroll active tab into view (centered)
   requestAnimationFrame(() => {
@@ -478,10 +836,12 @@ function attachTabDrag(bar){
     }
   }, {passive: false});
 }
-function switchTab(id){ currentTab=id; renderTabs(); renderView(); }
+function switchTab(id){ if(!canAccessTab(id)) return; currentTab=id; renderTabs(); renderView(); }
 
 function renderView(){
   const v = document.getElementById('view');
+  if(!v || !currentUser) return;
+  if(!canAccessTab(currentTab)) currentTab = (TABS.find(t => canAccessTab(t.id))||{id:'painel'}).id;
   if(currentTab==='painel') v.innerHTML = viewPainel();
   else if(currentTab==='clientes') v.innerHTML = viewClientes();
   else if(currentTab==='obras') v.innerHTML = viewObras();
@@ -490,6 +850,7 @@ function renderView(){
   else if(currentTab==='equipamentos') v.innerHTML = viewEquipamentos();
   else if(currentTab==='trabalhadores') v.innerHTML = viewTrabalhadores();
   else if(currentTab==='orcamentos') v.innerHTML = viewOrcamentos();
+  else if(currentTab==='utilizadores') v.innerHTML = viewUtilizadores();
 }
 
 // ============ 4. DIRTY FLAG ============
@@ -497,6 +858,10 @@ let _dirty = false;
 function markDirty(){ _dirty = true; }
 function clearDirty(){ _dirty = false; }
 function hasDirty(){ return _dirty; }
+function _warn(msg){
+  console.warn('[TRITED]', msg);
+  try { alert(msg); } catch(e){}
+}
 window.addEventListener('beforeunload', function(e){
   if(_dirty){ e.preventDefault(); e.returnValue = ''; }
 });
@@ -528,6 +893,36 @@ function clientStatus(clienteId){
 }
 
 // ============ 6. PAINEL ============
+
+function viewPainelTrabalhador(){
+  const ESTADOS_ABERTOS = ['em_curso','pausada','aguarda_material','espera_cliente','falta_termo','pronto_faturar'];
+  const obrasAbertas = [...state.obras]
+    .filter(o => ESTADOS_ABERTOS.includes(o.estado||'em_curso'))
+    .sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+    .slice(0,10);
+  const hoje = today();
+  const presHoje = state.presencas.filter(p => p.data === hoje).length;
+  return `
+  <div class="grid-3 mb-6">
+    <div class="card p-5"><div class="label">Obras em Aberto</div><div class="stat-num stat-blue">${state.obras.filter(o => ESTADOS_ABERTOS.includes(o.estado||'em_curso')).length}</div></div>
+    <div class="card p-5"><div class="label">Presenças Hoje</div><div class="stat-num stat-accent">${presHoje}</div></div>
+    <div class="card p-5"><div class="label">Concluídas</div><div class="stat-num stat-ok">${state.obras.filter(o=>o.estado==='concluida').length}</div></div>
+  </div>
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold">🔨 Obras disponíveis</h2>
+      <button class="btn btn-ghost" onclick="switchTab('obras')">Ver obras →</button>
+    </div>
+    ${obrasAbertas.length === 0
+      ? `<div class="empty"><div class="empty-icon">✓</div>Nenhuma obra em aberto.</div>`
+      : `<table><thead><tr><th>Nº</th><th>Data</th><th>Descrição</th><th>Estado</th></tr></thead><tbody>${obrasAbertas.map(o => {
+          const est = obraEstado(o);
+          return `<tr class="clickable" onclick="openObra('${o.id}')"><td class="obra-num">${obraLabel(o)}</td><td>${fmtDate(o.data)}</td><td>${escapeHtml((o.descricao||'').slice(0,80))}</td><td><span class="badge ${est.cls}">${est.label}</span></td></tr>`;
+        }).join('')}</tbody></table>`
+    }
+  </div>`;
+}
+
 function renderMonthlyChart(){
   // Últimos 12 meses: faturado (valor de obras criadas) + recebido (valorPago)
   const now = new Date();
@@ -601,6 +996,7 @@ function renderMonthlyChart(){
 }
 
 function viewPainel(){
+  if(currentUser && currentUser.role === 'trabalhador') return viewPainelTrabalhador();
   let totalDivida = 0, totalRecebido = 0;
   state.obras.forEach(o => {
     const v = Number(o.valor||0), p = Number(o.valorPago||0);
@@ -784,7 +1180,7 @@ function editCliente(id){
       <div class="flex justify-between mt-6">
         ${id?`<button class="btn btn-danger" onclick="deleteCliente('${id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="${id?`openCliente('${id}')`:'closeModal()'}">Cancelar</button>
+          <button class="btn btn-ghost" onclick="${id?`openCliente('${id}')`:'closeModal(true)'}">Cancelar</button>
           <button class="btn btn-primary" onclick="saveCliente('${id||''}')">Guardar</button>
         </div>
       </div>
@@ -792,27 +1188,35 @@ function editCliente(id){
   `);
 }
 async function saveCliente(id){
-  const data = {
-    nome: document.getElementById('f-nome').value.trim(),
-    nif: document.getElementById('f-nif').value.trim(),
-    morada: document.getElementById('f-morada').value.trim(),
-    codPostal: document.getElementById('f-cp').value.trim(),
-    localidade: document.getElementById('f-loc').value.trim(),
-    contacto: document.getElementById('f-contacto').value.trim(),
-    email: document.getElementById('f-email').value.trim(),
-    notas: document.getElementById('f-notas').value.trim(),
-  };
-  if(!data.nome){ alert('Nome é obrigatório'); return; }
-  let finalId = id;
-  if(id){
-    const i = state.clients.findIndex(c=>c.id===id);
-    state.clients[i] = {...state.clients[i], ...data};
-  } else {
-    finalId = uid();
-    state.clients.push({id:finalId, ...data});
-  }
-  await save('clients');
-  openCliente(finalId);
+  if(window._saving) return; window._saving = true;
+  try {
+    const data = {
+      nome: document.getElementById('f-nome').value.trim(),
+      nif: document.getElementById('f-nif').value.trim(),
+      morada: document.getElementById('f-morada').value.trim(),
+      codPostal: document.getElementById('f-cp').value.trim(),
+      localidade: document.getElementById('f-loc').value.trim(),
+      contacto: document.getElementById('f-contacto').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      notas: document.getElementById('f-notas').value.trim(),
+    };
+    if(!data.nome){ alert('Nome é obrigatório'); return; }
+    let finalId = id;
+    if(id){
+      const i = state.clients.findIndex(c=>c.id===id);
+      if(i < 0){ alert('Cliente não encontrado.'); return; }
+      state.clients[i] = {...state.clients[i], ...data};
+    } else {
+      finalId = uid();
+      state.clients.push({id:finalId, ...data});
+    }
+    await save('clients');
+    clearDirty();
+    closeModal(true);
+    renderView();
+  } catch(e){
+    console.error('saveCliente failed:', e);
+  } finally { window._saving = false; }
 }
 function deleteCliente(id){
   const c = state.clients.find(x=>x.id===id);
@@ -845,9 +1249,18 @@ async function _arquivarCliente(id){
   closeModal(true); currentTab='clientes'; renderTabs(); renderView();
 }
 async function _eliminarClienteConfirmado(id){
+  const prevClients = JSON.parse(JSON.stringify(state.clients));
+  const prevObras = JSON.parse(JSON.stringify(state.obras));
   state.clients = state.clients.filter(c=>c.id!==id);
   state.obras.forEach(o => { if(o.clienteId === id) o.clienteId = ''; });
-  await save('clients'); await save('obras');
+  try {
+    await saveMany(['clients','obras']);
+  } catch(e){
+    state.clients = prevClients;
+    state.obras = prevObras;
+    _warn('Falha ao eliminar cliente. Alterações revertidas em memória.');
+    return;
+  }
   closeModal(true); currentTab='clientes'; renderTabs(); renderView();
 }
 function _toggleArquivados(){
@@ -901,7 +1314,7 @@ function openCliente(id){
         </div>
         <div class="flex gap-2">
           <button class="btn btn-ghost" onclick="editCliente('${id}')">Editar</button>
-          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+          <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
         </div>
       </div>
 
@@ -949,6 +1362,7 @@ function openCliente(id){
 function openObra(id){
   const o = state.obras.find(x=>x.id===id); if(!o) return;
   const c = o.clienteId ? state.clients.find(x=>x.id===o.clienteId) : null;
+  const orcOrigem = o.orcamentoId ? orcamentoById(o.orcamentoId) : null;
   const pay = paymentStatus(o);
   const est = obraEstado(o);
   const valor = Number(o.valor||0);
@@ -970,6 +1384,7 @@ function openObra(id){
         <div class="flex gap-2">
           ${pay.key !== 'pago' && valor > 0?`<button class="btn btn-ok" onclick="registarPagamento('${o.id}')">€ Registar Pagamento</button>`:''}
           ${o.estado !== 'concluida' ? `<button class="btn btn-ok" onclick="setObraEstado('${o.id}','concluida')" title="Marcar como concluída">✓ Concluir</button>` : `<button class="btn btn-ghost" onclick="setObraEstado('${o.id}','em_curso')" title="Reabrir obra">↻ Reabrir</button>`}
+          ${obraInventarioItems(o).length > 0 && !o.stockBaixado ? `<button class="btn btn-primary" onclick="baixarStockObra('${o.id}')">📦 Dar baixa stock</button>` : ''}
           <button class="btn btn-accent" onclick="exportObraZIP('${o.id}', ${o.estado === 'concluida' ? 'true' : 'false'})">📦 ${o.estado === 'concluida' ? 'Extrair ZIP Final' : 'Exportar ZIP'}</button>
           <button class="btn btn-ghost" onclick="editObra('${o.id}')">Editar</button>
           <div style="position:relative;display:inline-block;">
@@ -980,7 +1395,7 @@ function openObra(id){
               <button onclick="document.getElementById('obra-menu-${o.id}').style.display='none';deleteObra('${o.id}')" style="width:100%;text-align:left;padding:11px 14px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--danger);font-size:14px;" onmouseover="this.style.background='var(--danger-soft)'" onmouseout="this.style.background=''">🗑 <span>Eliminar obra</span></button>
             </div>
           </div>
-          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+          <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
         </div>
       </div>
 
@@ -994,6 +1409,16 @@ function openObra(id){
         </div>
         <button class="btn ${c?'btn-ghost':'btn-accent'}" onclick="pickClienteForObra('${o.id}')">${c?'Mudar cliente':'+ Associar cliente'}</button>
       </div>
+
+      ${orcOrigem ? `
+      <div class="card p-4 mb-4 flex items-center justify-between gap-3" style="background:var(--bg-alt);">
+        <div>
+          <div class="label">Orçamento de Origem</div>
+          <div class="font-semibold mt-1" style="font-size:17px;color:var(--accent);">📋 ${orcLabel(orcOrigem)}</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">Esta obra foi criada a partir deste orçamento.</div>
+        </div>
+        <button class="btn btn-ghost" onclick="viewOrcamento('${orcOrigem.id}')">Abrir orçamento</button>
+      </div>` : ''}
 
       <div class="grid-3 mb-4">
         <div class="card p-4">
@@ -1041,6 +1466,8 @@ function openObra(id){
         <div style="white-space:pre-wrap;margin-top:8px;line-height:1.6;">${escapeHtml(o.descricao||'—')}</div>
       </div>
 
+      ${renderObraInventarioResumo(o)}
+
       <!-- Secção de Presenças — substitui Observações para ficar bem visível -->
       ${typeof presencasObraHtml === 'function' ? presencasObraHtml(o.id) : '<div style="color:red;">presencasObraHtml não definida</div>'}
 
@@ -1077,40 +1504,50 @@ function toggleObraMenu(id){
 }
 
 async function duplicarObra(id){
-  const orig = state.obras.find(x => x.id === id);
-  if(!orig) return;
-  const ano = currentYear();
-  const nova = {
-    id: uid(),
-    numero: nextObraNumForYear(ano),
-    ano,
-    clienteId: orig.clienteId || '',
-    data: today(),
-    dataConclusao: '',
-    descricao: 'CÓPIA - ' + (orig.descricao || ''),
-    observacoes: '',
-    valor: 0, valorPago: 0, dataPagamento: '', pagamentos: [],
-    estado: 'em_curso',
-    incluiFichaIted: !!orig.incluiFichaIted,
-    incluiFichaItur: !!orig.incluiFichaItur,
-    refId: '',
-    instalador: orig.instalador ? {...orig.instalador} : {nome:'',nif:'',numero:''},
-    itur: {
-      morada: '', codPostal: '', localidade: '', coordenadas: '',
-      manualIted: (orig.itur && orig.itur.manualIted) || ''
-    },
-    cabos: (orig.cabos || []).map(c => ({...c})),
-    materiais: (orig.materiais || []).map(m => ({...m})),
-    docObrig: orig.docObrig ? {...orig.docObrig} : {ensaios:false,calibracao:false,projeto:false},
-    docFacult: orig.docFacult || '',
-    equipamentosUsados: [...(orig.equipamentosUsados || [])],
-    ficheiros: {cobre:[], coaxial:[], fibra:[], fotos:[], outros:[]},
-    _duplicadaDe: orig.id
-  };
-  state.obras.push(nova);
-  await save('obras');
-  closeModal(true);
-  editObra(nova.id);
+  if(window._saving) return; window._saving = true;
+  try {
+    const orig = state.obras.find(x => x.id === id);
+    if(!orig) return;
+    const ano = currentYear();
+    const nova = {
+      id: uid(),
+      numero: nextObraNumForYear(ano),
+      ano,
+      clienteId: orig.clienteId || '',
+      data: today(),
+      dataConclusao: '',
+      descricao: 'CÓPIA - ' + (orig.descricao || ''),
+      observacoes: '',
+      valor: 0, valorPago: 0, dataPagamento: '', pagamentos: [],
+      estado: 'em_curso',
+      incluiFichaIted: !!orig.incluiFichaIted,
+      incluiFichaItur: !!orig.incluiFichaItur,
+      refId: '',
+      instalador: orig.instalador ? {...orig.instalador} : {nome:'',nif:'',numero:''},
+      itur: {
+        morada: '', codPostal: '', localidade: '', coordenadas: '',
+        manualIted: (orig.itur && orig.itur.manualIted) || ''
+      },
+      cabos: (orig.cabos || []).map(c => ({...c})),
+      materiais: (orig.materiais || []).map(m => ({...m})),
+      docObrig: orig.docObrig ? {...orig.docObrig} : {ensaios:false,calibracao:false,projeto:false},
+      docFacult: orig.docFacult || '',
+      equipamentosUsados: [...(orig.equipamentosUsados || [])],
+      itensInventario: (orig.itensInventario || []).map(item => ({...item, id:uid()})),
+      stockReservado: false,
+      stockReservadoEm: '',
+      stockBaixado: false,
+      stockBaixadoEm: '',
+      ficheiros: {cobre:[], coaxial:[], fibra:[], fotos:[], outros:[]},
+      _duplicadaDe: orig.id
+    };
+    state.obras.push(nova);
+    await save('obras');
+    closeModal(true);
+    editObra(nova.id);
+  } catch(e){
+    console.error('duplicarObra failed:', e);
+  } finally { window._saving = false; }
 }
 
 async function setObraEstado(id, novoEstado){
@@ -1123,8 +1560,25 @@ async function setObraEstado(id, novoEstado){
   }
   await save('obras');
   if(novoEstado === 'concluida' && !wasConcluida){
+    if(obraInventarioItems(o).filter(r => Number(r.quantidade || 0) > 0).length > 0 && !o.stockBaixado){
+      confirmAction(
+        `✓ Obra ${obraLabel(o)} marcada como concluída.
+
+Quer dar baixa no inventário dos materiais usados nesta obra?`,
+        async () => { const ok = await aplicarBaixaStockObra(id); if(ok) openObra(id); },
+        {
+          okLabel: '📦 Dar baixa no stock',
+          cancelLabel: 'Não agora',
+          okStyle: 'background:var(--blue);color:#fff;',
+          onCancel: () => openObra(id)
+        }
+      );
+      return;
+    }
     confirmAction(
-      `✓ Obra ${obraLabel(o)} marcada como concluída.\n\nQuer extrair agora o ZIP final com toda a documentação?`,
+      `✓ Obra ${obraLabel(o)} marcada como concluída.
+
+Quer extrair agora o ZIP final com toda a documentação?`,
       () => exportObraZIP(id, true),
       {
         okLabel: '📦 Extrair ZIP Final',
@@ -1193,17 +1647,22 @@ function registarPagamento(id){
   `);
 }
 async function confirmarPagamento(id){
-  const o = state.obras.find(x=>x.id===id);
-  const v = parseFloat(document.getElementById('p-valor').value)||0;
-  const d = document.getElementById('p-data').value || today();
-  const metodo = document.getElementById('p-metodo').value || '';
-  const nota = document.getElementById('p-nota').value || '';
-  if(v <= 0){ alert('Valor inválido'); return; }
-  if(!Array.isArray(o.pagamentos)) o.pagamentos = [];
-  o.pagamentos.push({id:uid(), data:d, valor:v, metodo, nota});
-  _recalcPagamento(o);
-  await save('obras');
-  openObra(id);
+  if(window._saving) return; window._saving = true;
+  try {
+    const o = state.obras.find(x=>x.id===id);
+    const v = parseFloat(document.getElementById('p-valor').value)||0;
+    const d = document.getElementById('p-data').value || today();
+    const metodo = document.getElementById('p-metodo').value || '';
+    const nota = document.getElementById('p-nota').value || '';
+    if(v <= 0){ alert('Valor inválido'); return; }
+    if(!Array.isArray(o.pagamentos)) o.pagamentos = [];
+    o.pagamentos.push({id:uid(), data:d, valor:v, metodo, nota});
+    _recalcPagamento(o);
+    await save('obras');
+    openObra(id);
+  } catch(e){
+    console.error('confirmarPagamento failed:', e);
+  } finally { window._saving = false; }
 }
 async function removerPagamento(obraId, pagId){
   const o = state.obras.find(x=>x.id===obraId);
@@ -1295,6 +1754,11 @@ function editObra(id, preClienteId){
       docObrig: {ensaios:false,calibracao:false,projeto:false},
       docFacult: '',
       equipamentosUsados: [],
+      itensInventario: [],
+      stockReservado: false,
+      stockReservadoEm: '',
+      stockBaixado: false,
+      stockBaixadoEm: '',
       ficheiros: { cobre:[], coaxial:[], fibra:[], fotos:[], outros:[] }
     };
     window._editingObraId = null;
@@ -1428,6 +1892,37 @@ function _renderObraModal(){
 
       ${itedSection}
 
+      <h3 class="serif text-lg font-bold mt-6 mb-3">📦 Materiais do Inventário Usados</h3>
+      <div class="section-box">
+        ${(o.itensInventario||[]).length === 0
+          ? '<div class="text-sm" style="color:var(--muted);">Nenhum material do inventário associado a esta obra.</div>'
+          : (o.itensInventario||[]).map((row,i) => {
+              const item = inventarioById(row.inventoryId);
+              const unidade = inventarioRowUnidade(row);
+              const stock = item ? Number(item.quantidade || 0) : 0;
+              return `<div class="mb-2 items-center" style="display:grid;grid-template-columns:1fr 120px 110px auto;gap:8px;">
+                <div class="file-item" style="margin-top:0;">
+                  <div style="flex:1;min-width:0;">
+                    <div class="file-name">${escapeHtml(inventarioRowLabel(row))}</div>
+                    <div class="text-xs" style="color:var(--muted);">Stock atual: ${item ? stock + ' ' + escapeHtml(unidade) : 'artigo removido'}</div>
+                  </div>
+                  ${inventarioStockBadge(row)}
+                </div>
+                <input class="input" type="number" min="0" step="0.01" data-inv-qt data-i="${i}" value="${Number(row.quantidade||0)}" placeholder="Qtd.">
+                <div class="text-sm" style="color:var(--muted);font-weight:600;">${escapeHtml(unidade)}</div>
+                <button class="btn btn-danger" onclick="removeInventarioFromObra(${i})">✕</button>
+              </div>`;
+            }).join('')
+        }
+        <div class="mt-3">
+          <select class="select" id="inv-add-sel" onchange="addInventarioToObra(this.value);this.value='';">
+            <option value="">+ Adicionar material do inventário...</option>
+            ${state.inventory.filter(it => !(o.itensInventario||[]).some(row => row.inventoryId === it.id)).map(it => `<option value="${it.id}">${escapeAttr(it.nome)} · Stock: ${Number(it.quantidade||0)} ${escapeAttr(it.unidade||'un')}</option>`).join('')}
+          </select>
+        </div>
+        <div class="text-xs mt-2" style="color:var(--muted);">A baixa no stock é feita uma única vez, ao concluir a obra ou pelo botão “Dar baixa stock” na ficha da obra.</div>
+      </div>
+
       <h3 class="serif text-lg font-bold mt-6 mb-3">🔧 Equipamentos Utilizados</h3>
       <div class="section-box">
         ${(o.equipamentosUsados||[]).length === 0
@@ -1457,7 +1952,7 @@ function _renderObraModal(){
       <div class="flex justify-between mt-6">
         ${id?`<button class="btn btn-danger" onclick="deleteObra('${id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="${id?`openObra('${id}')`:'closeModal()'}">Cancelar</button>
+          <button class="btn btn-ghost" onclick="${id?`openObra('${id}')`:'closeModal(true)'}">Cancelar</button>
           <button class="btn btn-primary" onclick="saveObra()">Guardar</button>
         </div>
       </div>
@@ -1490,6 +1985,34 @@ function addEquipToObra(eqId){
 function removeEquipFromObra(eqId){
   syncObraFromForm();
   window._editingObra.equipamentosUsados = (window._editingObra.equipamentosUsados||[]).filter(x=>x!==eqId);
+  _renderObraModal();
+}
+
+function addInventarioToObra(itemId){
+  if(!itemId) return;
+  syncObraFromForm();
+  const item = inventarioById(itemId);
+  if(!item) return;
+  const o = window._editingObra;
+  if(!Array.isArray(o.itensInventario)) o.itensInventario = [];
+  const existing = o.itensInventario.find(row => row.inventoryId === itemId);
+  if(existing){
+    existing.quantidade = Number(existing.quantidade || 0) + 1;
+  } else {
+    o.itensInventario.push({
+      id: uid(),
+      inventoryId: item.id,
+      nome: item.nome || '',
+      unidade: item.unidade || 'un',
+      quantidade: 1,
+      precoUnitario: Number(item.precoUnitario || 0)
+    });
+  }
+  _renderObraModal();
+}
+function removeInventarioFromObra(i){
+  syncObraFromForm();
+  if(Array.isArray(window._editingObra.itensInventario)) window._editingObra.itensInventario.splice(i,1);
   _renderObraModal();
 }
 
@@ -1643,6 +2166,18 @@ function syncObraFromForm(){
   o.valor = parseFloat(val('o-valor'))||0;
   o.valorPago = parseFloat(val('o-valorpago'))||0;
   o.dataPagamento = val('o-datapago');
+  if(!Array.isArray(o.itensInventario)) o.itensInventario = [];
+  document.querySelectorAll('[data-inv-qt]').forEach(el => {
+    const i = +el.dataset.i;
+    if(!o.itensInventario[i]) return;
+    const item = inventarioById(o.itensInventario[i].inventoryId);
+    o.itensInventario[i].quantidade = parseFloat(el.value) || 0;
+    if(item){
+      o.itensInventario[i].nome = item.nome || o.itensInventario[i].nome || '';
+      o.itensInventario[i].unidade = item.unidade || o.itensInventario[i].unidade || 'un';
+      o.itensInventario[i].precoUnitario = Number(item.precoUnitario || 0);
+    }
+  });
   // Checkbox Ficha ITED — compatível com versões antigas
   const itedCheckbox = document.getElementById('o-incluiIted');
   if(itedCheckbox) o.incluiFichaIted = itedCheckbox.checked;
@@ -1791,6 +2326,121 @@ function findCatalogMatch(item, tipo){
   });
 }
 
+function normalizeObraForSave(o){
+  if(!o) return o;
+  o.numero = Number(o.numero) || 1;
+  o.ano = Number(o.ano) || currentYear();
+  o.valor = Number(o.valor) || 0;
+  o.valorPago = Number(o.valorPago) || 0;
+  if(!o.estado) o.estado = 'em_curso';
+  if(!Array.isArray(o.pagamentos)) o.pagamentos = [];
+  if(!Array.isArray(o.equipamentosUsados)) o.equipamentosUsados = [];
+  if(o.orcamentoId === undefined) o.orcamentoId = '';
+  if(!Array.isArray(o.itensInventario)) o.itensInventario = [];
+  o.itensInventario = o.itensInventario
+    .filter(row => row && row.inventoryId && Number(row.quantidade || 0) > 0)
+    .map(row => {
+      const item = inventarioById(row.inventoryId);
+      return {
+        id: row.id || uid(),
+        inventoryId: row.inventoryId,
+        nome: item ? (item.nome || '') : (row.nome || ''),
+        unidade: item ? (item.unidade || 'un') : (row.unidade || 'un'),
+        quantidade: Number(row.quantidade || 0),
+        precoUnitario: item ? Number(item.precoUnitario || 0) : Number(row.precoUnitario || 0)
+      };
+    });
+  o.stockReservado = !!o.stockReservado;
+  if(o.stockReservadoEm === undefined) o.stockReservadoEm = '';
+  o.stockBaixado = !!o.stockBaixado;
+  if(o.stockBaixadoEm === undefined) o.stockBaixadoEm = '';
+  if(!o.ficheiros) o.ficheiros = {};
+  ['cobre','coaxial','fibra','fotos','outros'].forEach(k => { if(!Array.isArray(o.ficheiros[k])) o.ficheiros[k] = []; });
+  if(o.incluiFichaIted || o.incluiFichaItur){
+    if(!o.instalador) o.instalador = {nome:'',nif:'',numero:''};
+    if(!o.itur) o.itur = {morada:'',codPostal:'',localidade:'',coordenadas:'',manualIted:''};
+    if(!Array.isArray(o.cabos)) o.cabos = [];
+    if(!Array.isArray(o.materiais)) o.materiais = [];
+    if(!o.docObrig) o.docObrig = {ensaios:false,calibracao:false,projeto:false};
+    if(o.docFacult === undefined) o.docFacult = '';
+    if(o.refId === undefined) o.refId = '';
+  }
+  return o;
+}
+
+function validarBaixaStockObra(obra){
+  const items = obraInventarioItems(obra).filter(row => row && row.inventoryId && Number(row.quantidade || 0) > 0);
+  const problemas = [];
+  items.forEach(row => {
+    const item = inventarioById(row.inventoryId);
+    const qtd = Number(row.quantidade || 0);
+    if(!item){
+      problemas.push(`${inventarioRowLabel(row)}: artigo não existe no inventário.`);
+      return;
+    }
+    const stock = Number(item.quantidade || 0);
+    if(qtd > stock){
+      problemas.push(`${item.nome}: precisa de ${qtd} ${item.unidade || 'un'}, mas só existem ${stock} ${item.unidade || 'un'}.`);
+    }
+  });
+  return {items, problemas};
+}
+async function aplicarBaixaStockObra(id){
+  const obra = state.obras.find(x => x.id === id);
+  if(!obra){ alert('Obra não encontrada.'); return false; }
+  if(obra.stockBaixado){ alert('O stock desta obra já foi baixado.'); return false; }
+  const check = validarBaixaStockObra(obra);
+  if(check.items.length === 0){ alert('Esta obra não tem materiais do inventário associados.'); return false; }
+  if(check.problemas.length > 0){
+    alert('Não foi possível dar baixa no stock:\n\n' + check.problemas.join('\n'));
+    return false;
+  }
+  const prevInventory = JSON.parse(JSON.stringify(state.inventory));
+  const prevObras = JSON.parse(JSON.stringify(state.obras));
+  try {
+    check.items.forEach(row => {
+      const item = inventarioById(row.inventoryId);
+      if(item) item.quantidade = Math.max(0, Number(item.quantidade || 0) - Number(row.quantidade || 0));
+    });
+    obra.stockBaixado = true;
+    obra.stockBaixadoEm = today();
+    obra.stockReservado = false;
+    obra.stockReservadoEm = '';
+    await saveMany(['inventory','obras']);
+    return true;
+  } catch(e){
+    state.inventory = prevInventory;
+    state.obras = prevObras;
+    alert('Erro ao dar baixa no stock. Alterações revertidas em memória.');
+    console.error('aplicarBaixaStockObra failed:', e);
+    return false;
+  }
+}
+function baixarStockObra(id){
+  const obra = state.obras.find(x => x.id === id);
+  if(!obra) return;
+  if(obra.stockBaixado){ alert('O stock desta obra já foi baixado.'); return; }
+  const check = validarBaixaStockObra(obra);
+  if(check.items.length === 0){ alert('Esta obra não tem materiais do inventário associados.'); return; }
+  if(check.problemas.length > 0){
+    alert('Antes de dar baixa, corrija o stock:\n\n' + check.problemas.join('\n'));
+    return;
+  }
+  const resumo = check.items.map(row => {
+    const item = inventarioById(row.inventoryId);
+    return `• ${item.nome}: -${Number(row.quantidade || 0)} ${item.unidade || 'un'}`;
+  }).join('\n');
+  confirmAction(
+    `Dar baixa no inventário da Obra ${obraLabel(obra)}?
+
+${resumo}
+
+Esta ação só deve ser feita uma vez.`,
+    async () => { const ok = await aplicarBaixaStockObra(id); if(ok) openObra(id); },
+    { okLabel:'📦 Dar baixa', cancelLabel:'Cancelar', okStyle:'background:var(--blue);color:#fff;' }
+  );
+}
+
 function obraCatalogDiff(obra){
   // Devolve { novos: [...], alterados: [...] }
   const novos = [];
@@ -1890,7 +2540,7 @@ function showCatalogSyncDialog(diff, onDone){
     </div>
   `);
 
-  document.getElementById('cat-skip-btn').onclick = () => { closeModal(); onDone(); };
+  document.getElementById('cat-skip-btn').onclick = () => { closeModal(true); onDone(); };
   document.getElementById('cat-apply-btn').onclick = async () => {
     // Adicionar novos selecionados
     document.querySelectorAll('[data-novo]').forEach(cb => {
@@ -1924,15 +2574,16 @@ function showCatalogSyncDialog(diff, onDone){
       }
     });
     await save('catalog');
-    closeModal();
+    closeModal(true);
     onDone();
   };
 }
 
 async function saveObra(){
+  if(window._saving) return; window._saving = true;
   try {
     syncObraFromForm();
-    const data = window._editingObra;
+    const data = normalizeObraForSave(window._editingObra);
     const id = window._editingObraId;
     // Descrição não é obrigatória — permite guardar como rascunho
     if(!data.descricao || !data.descricao.trim()){
@@ -1945,32 +2596,62 @@ async function saveObra(){
       else state.obras.push({...data, id});
     } else {
       finalId = window._editingObraPreId || uid();
+      // Recalcular número para evitar duplicados
+      data.numero = nextObraNumForYear(data.ano);
       state.obras.push({...data, id:finalId});
       window._editingObraPreId = null;
     }
     await save('obras');
-    if(typeof clearDirty === 'function') clearDirty();
+    clearDirty();
 
     // Verificar catálogo se a obra tiver ITED ou ITUR
     if(data.incluiFichaIted || data.incluiFichaItur){
       const diff = obraCatalogDiff(data);
       if(diff.novos.length > 0 || diff.alterados.length > 0){
-        showCatalogSyncDialog(diff, () => openObra(finalId));
+        showCatalogSyncDialog(diff, () => { closeModal(true); renderView(); });
         return;
       }
     }
-    openObra(finalId);
+    closeModal(true);
+    renderView();
   } catch(e){
-    alert('Erro ao guardar a obra: ' + e.message + '\n\nAbra F12 → Console para ver o erro completo.');
+    alert('Erro ao guardar a obra: ' + e.message);
     console.error('saveObra failed:', e);
-  }
+  } finally { window._saving = false; }
 }
 
 function deleteObra(id){
   confirmAction('Eliminar esta obra? Esta ação não pode ser revertida.', async () => {
-    state.obras = state.obras.filter(o=>o.id!==id);
-    await save('obras');
-    closeModal();
+    if(window._saving) return; window._saving = true;
+    const prevObras = JSON.parse(JSON.stringify(state.obras));
+    const prevOrcamentos = JSON.parse(JSON.stringify(state.orcamentos || []));
+    const o = state.obras.find(x=>x.id===id);
+    const fileKeys = o ? flattenObraFileKeys(o) : [];
+    try {
+      state.obras = state.obras.filter(o=>o.id!==id);
+      const linked = state.orcamentos.find(or => or.obraId === id || (o && o.orcamentoId && or.id === o.orcamentoId));
+      if(linked){
+        linked.obraId = '';
+        if(linked.estado === 'convertido') linked.estado = 'aceite';
+      }
+      await saveMany(linked ? ['obras','orcamentos'] : ['obras']);
+
+      // Só apaga ficheiros depois dos dados ficarem guardados com sucesso.
+      for(const key of fileKeys){
+        try { await deleteStoredFile(key); }
+        catch(e){ console.warn('Falha ao apagar ficheiro órfão:', key, e); }
+      }
+
+      closeModal(true);
+      renderView();
+    } catch(e){
+      state.obras = prevObras;
+      state.orcamentos = prevOrcamentos;
+      console.error('deleteObra failed:', e);
+      alert('Falha ao eliminar obra. Alterações revertidas em memória.');
+    } finally {
+      window._saving = false;
+    }
   });
 }
 
@@ -1995,7 +2676,7 @@ function previewObraPDF(id, tipo){
           ${switcher}
           <button class="btn btn-ghost" onclick="openObra('${id}')">Voltar</button>
           <button class="btn btn-accent" onclick="exportObraPDF('${id}','${tipo}')">↓ Exportar PDF</button>
-          <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+          <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
         </div>
       </div>
       <div style="max-width:100%;overflow-x:auto;background:#d8dde5;padding:20px;border-radius:10px;">
@@ -2335,6 +3016,7 @@ function viewObras(){
 
 // ============ 12. CATÁLOGO ============
 function viewCatalogo(){
+  const readOnly = !canEditCatalog();
   const cabos = state.catalog.filter(c => c.tipo === 'cabo');
   const materiais = state.catalog.filter(c => c.tipo !== 'cabo');
   return `
@@ -2343,7 +3025,7 @@ function viewCatalogo(){
       <h2 class="text-2xl font-bold">Catálogo de Material</h2>
       <p class="text-sm" style="color:var(--muted);">${state.catalog.length} artigo(s) · ${cabos.length} cabo(s) · ${materiais.length} material(is)</p>
     </div>
-    <button class="btn btn-accent" onclick="editCatItem()">+ Novo Artigo</button>
+    ${readOnly ? '<span class="badge badge-blue">Só consulta</span>' : '<button class="btn btn-accent" onclick="editCatItem()">+ Novo Artigo</button>'}
   </div>
 
   <div class="card mb-6">
@@ -2354,14 +3036,16 @@ function viewCatalogo(){
     ${cabos.length === 0
       ? `<div class="empty">Sem cabos no catálogo</div>`
       : `<table>
-          <thead><tr><th>Tecnologia</th><th>Marca / Modelo</th><th>Referência</th><th>Classe RPC</th><th></th></tr></thead>
+          <thead><tr><th>Tecnologia</th><th>Marca / Modelo</th><th>Referência</th><th>Classe RPC</th><th>Un.</th><th style="text-align:right;">Preço</th><th></th></tr></thead>
           <tbody>${cabos.map(c => `
-            <tr class="clickable" onclick="editCatItem('${c.id}')">
+            <tr class="${readOnly ? '' : 'clickable'}" ${readOnly ? '' : `onclick="editCatItem('${c.id}')"`}>
               <td class="font-semibold">${escapeHtml(c.tecnologia||c.designacao||'—')}</td>
               <td>${escapeHtml(c.marca||'—')}</td>
               <td>${escapeHtml(c.ref||'—')}</td>
               <td>${escapeHtml(c.classe||'—')}</td>
-              <td class="text-right"><span style="color:var(--muted);">→</span></td>
+              <td>${escapeHtml(catalogUnit(c))}</td>
+              <td style="text-align:right;font-weight:600;">${catalogPrice(c)?fmt(catalogPrice(c)):'—'}</td>
+              <td class="text-right">${readOnly ? '<span class="badge badge-neutral">Consulta</span>' : '<span style="color:var(--muted);">→</span>'}</td>
             </tr>
           `).join('')}</tbody>
         </table>`
@@ -2376,14 +3060,16 @@ function viewCatalogo(){
     ${materiais.length === 0
       ? `<div class="empty">Sem materiais no catálogo</div>`
       : `<table>
-          <thead><tr><th>Designação</th><th>Marca / Modelo</th><th>Referência</th><th>Notas</th><th></th></tr></thead>
+          <thead><tr><th>Designação</th><th>Marca / Modelo</th><th>Referência</th><th>Un.</th><th style="text-align:right;">Preço</th><th>Notas</th><th></th></tr></thead>
           <tbody>${materiais.map(c => `
-            <tr class="clickable" onclick="editCatItem('${c.id}')">
+            <tr class="${readOnly ? '' : 'clickable'}" ${readOnly ? '' : `onclick="editCatItem('${c.id}')"`}>
               <td class="font-semibold">${escapeHtml(c.designacao||c.nome||'—')}</td>
               <td>${escapeHtml(c.marca||'—')}</td>
               <td>${escapeHtml(c.ref||'—')}</td>
+              <td>${escapeHtml(catalogUnit(c))}</td>
+              <td style="text-align:right;font-weight:600;">${catalogPrice(c)?fmt(catalogPrice(c)):'—'}</td>
               <td>${escapeHtml((c.notas||'').slice(0,40))}</td>
-              <td class="text-right"><span style="color:var(--muted);">→</span></td>
+              <td class="text-right">${readOnly ? '<span class="badge badge-neutral">Consulta</span>' : '<span style="color:var(--muted);">→</span>'}</td>
             </tr>
           `).join('')}</tbody>
         </table>`
@@ -2392,7 +3078,8 @@ function viewCatalogo(){
 }
 
 function editCatItem(id){
-  const c = id ? state.catalog.find(x=>x.id===id) : {tipo:'material',tecnologia:'',designacao:'',marca:'',ref:'',classe:'',notas:''};
+  if(!canEditCatalog()){ alert('Sem permissão para alterar o catálogo.'); return; }
+  const c = id ? state.catalog.find(x=>x.id===id) : {tipo:'material',tecnologia:'',designacao:'',marca:'',ref:'',classe:'',unidade:'un',precoUnit:0,notas:''};
   window._editingCat = JSON.parse(JSON.stringify(c));
   window._editingCatId = id || null;
   _renderCatItemModal();
@@ -2420,12 +3107,16 @@ function _renderCatItemModal(){
           <div><label class="label">Classe RPC</label><input class="input" id="cat-classe" value="${escapeAttr(c.classe||'')}" placeholder="ex: Eca, Dca-s2"></div>
           <div><label class="label">Marca e Modelo</label><input class="input" id="cat-marca" value="${escapeAttr(c.marca||'')}"></div>
           <div><label class="label">Referência do Produto</label><input class="input" id="cat-ref" value="${escapeAttr(c.ref||'')}"></div>
+          <div><label class="label">Unidade p/ orçamento</label><input class="input" id="cat-unidade" value="${escapeAttr(catalogUnit(c))}" placeholder="un, m, h..."></div>
+          <div><label class="label">Preço Unitário (€)</label><input class="input" type="number" min="0" step="0.01" id="cat-preco" value="${catalogPrice(c)}"></div>
         </div>
       ` : `
         <div class="grid-2">
           <div><label class="label">Designação *</label><input class="input" id="cat-des" value="${escapeAttr(c.designacao||'')}" placeholder="ex: Tomada RJ45, Repartidor"></div>
           <div><label class="label">Marca e Modelo</label><input class="input" id="cat-marca" value="${escapeAttr(c.marca||'')}"></div>
           <div><label class="label">Referência do Produto</label><input class="input" id="cat-ref" value="${escapeAttr(c.ref||'')}"></div>
+          <div><label class="label">Unidade p/ orçamento</label><input class="input" id="cat-unidade" value="${escapeAttr(catalogUnit(c))}" placeholder="un, m, h..."></div>
+          <div><label class="label">Preço Unitário (€)</label><input class="input" type="number" min="0" step="0.01" id="cat-preco" value="${catalogPrice(c)}"></div>
         </div>
       `}
 
@@ -2434,7 +3125,7 @@ function _renderCatItemModal(){
       <div class="flex justify-between mt-6">
         ${id?`<button class="btn btn-danger" onclick="deleteCatItem('${id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
           <button class="btn btn-primary" onclick="saveCatItem()">Guardar</button>
         </div>
       </div>
@@ -2462,30 +3153,40 @@ function syncCatItemFromForm(){
   }
   c.marca = val('cat-marca');
   c.ref = val('cat-ref');
+  c.unidade = val('cat-unidade') || 'un';
+  c.precoUnit = parseFloat(val('cat-preco')) || 0;
   c.notas = val('cat-notas');
 }
 
 async function saveCatItem(){
-  syncCatItemFromForm();
-  const c = window._editingCat;
-  const id = window._editingCatId;
-  if(c.tipo === 'cabo' && !c.tecnologia){ alert('Tecnologia é obrigatória'); return; }
-  if(c.tipo !== 'cabo' && !c.designacao){ alert('Designação é obrigatória'); return; }
-  if(id){
-    const i = state.catalog.findIndex(x=>x.id===id);
-    state.catalog[i] = {...c, id};
-  } else {
-    state.catalog.push({...c, id:uid()});
-  }
-  await save('catalog');
-  closeModal();
+  if(!canEditCatalog()){ alert('Sem permissão para alterar o catálogo.'); return; }
+  if(window._saving) return; window._saving = true;
+  try {
+    syncCatItemFromForm();
+    const c = window._editingCat;
+    const id = window._editingCatId;
+    if(c.tipo === 'cabo' && !c.tecnologia){ alert('Tecnologia é obrigatória'); return; }
+    if(c.tipo !== 'cabo' && !c.designacao){ alert('Designação é obrigatória'); return; }
+    if(id){
+      const i = state.catalog.findIndex(x=>x.id===id);
+      if(i >= 0) state.catalog[i] = {...c, id};
+    } else {
+      state.catalog.push({...c, id:uid()});
+    }
+    await save('catalog');
+    clearDirty();
+    closeModal(true);
+  } catch(e){
+    console.error('saveCatItem failed:', e);
+  } finally { window._saving = false; }
 }
 
 function deleteCatItem(id){
+  if(!canEditCatalog()){ alert('Sem permissão para alterar o catálogo.'); return; }
   confirmAction('Eliminar este artigo do catálogo?', async () => {
     state.catalog = state.catalog.filter(x=>x.id!==id);
     await save('catalog');
-    closeModal();
+    closeModal(true);
   });
 }
 
@@ -2499,13 +3200,17 @@ function viewInventario(){
   </div>
   ${state.inventory.length===0
     ? `<div class="card empty"><div class="empty-icon">📦</div>Sem artigos em inventário.</div>`
-    : `<div class="card"><table><thead><tr><th>Artigo</th><th>Categoria</th><th>Quantidade</th><th>Preço Unit.</th><th>Valor</th><th></th></tr></thead><tbody>${
+    : `<div class="card"><table><thead><tr><th>Artigo</th><th>Categoria</th><th>Stock</th><th>Reservado</th><th>Disponível</th><th>Preço Unit.</th><th>Valor</th><th></th></tr></thead><tbody>${
         state.inventory.map(it=>{
           const valor = Number(it.quantidade||0)*Number(it.precoUnitario||0);
+          const reservado = inventarioReservado(it.id);
+          const disponivel = inventarioDisponivel(it.id);
           return `<tr>
             <td class="font-semibold">${escapeHtml(it.nome)}</td>
             <td>${escapeHtml(it.categoria||'—')}</td>
             <td>${it.quantidade||0} ${escapeHtml(it.unidade||'un')}</td>
+            <td>${reservado} ${escapeHtml(it.unidade||'un')}</td>
+            <td><span class="badge ${disponivel>0?'badge-ok':'badge-warn'}">${disponivel} ${escapeHtml(it.unidade||'un')}</span></td>
             <td>${fmt(it.precoUnitario)}</td>
             <td class="font-semibold">${fmt(valor)}</td>
             <td class="text-right"><button class="btn btn-ghost" onclick="editItem('${it.id}')">Editar</button> <button class="btn btn-danger" onclick="deleteItem('${it.id}')" title="Eliminar">🗑</button></td>
@@ -2530,7 +3235,7 @@ function editItem(id){
       <div class="flex justify-between mt-6">
         ${id?`<button class="btn btn-danger" onclick="deleteItem('${id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
           <button class="btn btn-primary" onclick="saveItem('${id||''}')">Guardar</button>
         </div>
       </div>
@@ -2538,22 +3243,29 @@ function editItem(id){
   `);
 }
 async function saveItem(id){
-  const data = {
-    nome: document.getElementById('i-nome').value.trim(),
-    categoria: document.getElementById('i-cat').value.trim(),
-    quantidade: parseFloat(document.getElementById('i-qt').value)||0,
-    unidade: document.getElementById('i-un').value.trim()||'un',
-    precoUnitario: parseFloat(document.getElementById('i-preco').value)||0,
-    notas: document.getElementById('i-notas').value.trim(),
-  };
-  if(!data.nome){ alert('Nome é obrigatório'); return; }
-  if(id){
-    const i = state.inventory.findIndex(x=>x.id===id);
-    state.inventory[i] = {...state.inventory[i], ...data};
-  } else {
-    state.inventory.push({id:uid(), ...data});
-  }
-  await save('inventory'); closeModal(true); renderView();
+  if(window._saving) return; window._saving = true;
+  try {
+    const data = {
+      nome: document.getElementById('i-nome').value.trim(),
+      categoria: document.getElementById('i-cat').value.trim(),
+      quantidade: parseFloat(document.getElementById('i-qt').value)||0,
+      unidade: document.getElementById('i-un').value.trim()||'un',
+      precoUnitario: parseFloat(document.getElementById('i-preco').value)||0,
+      notas: document.getElementById('i-notas').value.trim(),
+    };
+    if(!data.nome){ alert('Nome é obrigatório'); return; }
+    if(id){
+      const i = state.inventory.findIndex(x=>x.id===id);
+      if(i >= 0) state.inventory[i] = {...state.inventory[i], ...data};
+    } else {
+      state.inventory.push({id:uid(), ...data});
+    }
+    await save('inventory');
+    clearDirty();
+    closeModal(true); renderView();
+  } catch(e){
+    console.error('saveItem failed:', e);
+  } finally { window._saving = false; }
 }
 function deleteItem(id){
   confirmAction('Eliminar este artigo do inventário?', async () => {
@@ -2641,7 +3353,7 @@ function _renderEquipModal(){
       <div class="flex justify-between mt-6">
         ${eq.id?`<button class="btn btn-danger" onclick="deleteEquip('${eq.id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
           <button class="btn btn-primary" onclick="saveEquip()">Guardar</button>
         </div>
       </div>
@@ -2672,20 +3384,32 @@ function syncEquipFromForm(){
 function addLic(){ syncEquipFromForm(); window._editingEquip.licencas.push({nome:'',dataInicio:'',dataFim:''}); _renderEquipModal(); }
 function removeLic(i){ syncEquipFromForm(); window._editingEquip.licencas.splice(i,1); _renderEquipModal(); }
 async function saveEquip(){
-  syncEquipFromForm();
-  const eq = window._editingEquip;
-  if(!eq.nome){ alert('Nome é obrigatório'); return; }
-  if(eq.id){
-    const i = state.equipment.findIndex(x=>x.id===eq.id);
-    state.equipment[i] = eq;
-  } else {
-    eq.id = uid();
-    state.equipment.push(eq);
-  }
-  await save('equipment'); closeModal(true); renderView();
+  if(window._saving) return; window._saving = true;
+  try {
+    syncEquipFromForm();
+    const eq = window._editingEquip;
+    if(!eq.nome){ alert('Nome é obrigatório'); return; }
+    if(eq.id){
+      const i = state.equipment.findIndex(x=>x.id===eq.id);
+      if(i >= 0) state.equipment[i] = eq;
+    } else {
+      eq.id = uid();
+      state.equipment.push(eq);
+    }
+    await save('equipment');
+    clearDirty();
+    closeModal(true); renderView();
+  } catch(e){
+    console.error('saveEquip failed:', e);
+  } finally { window._saving = false; }
 }
 function deleteEquip(id){
   confirmAction('Eliminar este equipamento e todas as suas licenças?', async () => {
+    const eq = state.equipment.find(x=>x.id===id);
+    if(eq){
+      const fileKeys = flattenEquipmentFileKeys(eq);
+      for(const key of fileKeys) await deleteStoredFile(key);
+    }
     state.equipment = state.equipment.filter(x=>x.id!==id);
     await save('equipment'); closeModal(true); renderView();
   });
@@ -2698,7 +3422,7 @@ function openModal(html){
     m = document.createElement('div');
     m.id = 'modal';
     m.className = 'modal-bg';
-    m.addEventListener('click', e=>{ if(e.target===m) closeModal(); });
+    m.addEventListener('click', e=>{ if(e.target===m) closeModal(true); });
     // Mark dirty on any form change inside modal
     m.addEventListener('input', function(){ markDirty(); });
     document.body.appendChild(m);
@@ -2707,8 +3431,10 @@ function openModal(html){
   m.innerHTML = `<div class="modal" onclick="event.stopPropagation()">${html}</div>`;
   m.style.display = 'flex';
 }
-function closeModal(skipDirtyCheck){
-  if(!skipDirtyCheck && hasDirty()){
+function closeModal(skipDirtyCheck = true){
+  // Fecha sempre por defeito.
+  // Só pede confirmação se alguma chamada usar closeModal(false).
+  if(skipDirtyCheck === false && hasDirty()){
     if(!confirm('Tem alterações por guardar. Quer mesmo fechar?')) return;
   }
   clearDirty();
@@ -2741,7 +3467,11 @@ function confirmAction(message, onConfirm, opts){
   document.body.appendChild(wrap);
   const close = () => wrap.remove();
   wrap.querySelector('[data-act="cancel"]').onclick = () => { close(); if(opts.onCancel) try{opts.onCancel();}catch(e){} };
-  wrap.querySelector('[data-act="ok"]').onclick = () => { close(); try { onConfirm(); } catch(e){ alert('Erro: '+e.message); } };
+  wrap.querySelector('[data-act="ok"]').onclick = async () => {
+    close();
+    try { await Promise.resolve(onConfirm()); }
+    catch(e){ alert('Erro: '+e.message); }
+  };
   wrap.addEventListener('click', e => { if(e.target === wrap){ close(); if(opts.onCancel) try{opts.onCancel();}catch(e){} } });
 }
 
@@ -2967,7 +3697,7 @@ function editTrabalhador(id){
     <div class="p-6">
       <div class="flex items-center justify-between mb-5">
         <h2 class="text-2xl font-bold">${id?'Editar':'Novo'} Trabalhador</h2>
-        <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+        <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
       </div>
       <div class="grid-2 mb-4">
         <div><label class="label">Nome *</label><input class="input" id="w-nome" value="${escapeAttr(w.nome||'')}" placeholder="ex: João Ferreira" autofocus></div>
@@ -2976,7 +3706,7 @@ function editTrabalhador(id){
       <div class="flex justify-between mt-6">
         ${id?`<button class="btn btn-danger" onclick="deleteTrabalhador('${id}')">Eliminar</button>`:'<div></div>'}
         <div class="flex gap-2">
-          <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
           <button class="btn btn-primary" onclick="saveTrabalhador('${id||''}')">Guardar</button>
         </div>
       </div>
@@ -2985,20 +3715,25 @@ function editTrabalhador(id){
 }
 
 async function saveTrabalhador(id){
-  _ensureWorkersStorage();
-  const nome = document.getElementById('w-nome').value.trim();
-  if(!nome){ alert('O nome é obrigatório.'); return; }
-  const notas = document.getElementById('w-notas').value.trim();
-  if(id){
-    const i = state.workers.findIndex(x => x.id === id);
-    if(i >= 0) state.workers[i] = {...state.workers[i], nome, notas};
-  } else {
-    state.workers.push({id: uid(), nome, notas});
-  }
-  await save('workers');
-  if(typeof clearDirty === 'function') clearDirty();
-  closeModal(true);
-  renderView();
+  if(window._saving) return; window._saving = true;
+  try {
+    _ensureWorkersStorage();
+    const nome = document.getElementById('w-nome').value.trim();
+    if(!nome){ alert('O nome é obrigatório.'); return; }
+    const notas = document.getElementById('w-notas').value.trim();
+    if(id){
+      const i = state.workers.findIndex(x => x.id === id);
+      if(i >= 0) state.workers[i] = {...state.workers[i], nome, notas};
+    } else {
+      state.workers.push({id: uid(), nome, notas});
+    }
+    await save('workers');
+    clearDirty();
+    closeModal(true);
+    renderView();
+  } catch(e){
+    console.error('saveTrabalhador failed:', e);
+  } finally { window._saving = false; }
 }
 
 function deleteTrabalhador(id){
@@ -3013,10 +3748,18 @@ function deleteTrabalhador(id){
     msg += `\n\nNão tem presenças registadas. Pode eliminar sem perder nada.`;
   }
   confirmAction(msg, async () => {
+    const prevWorkers = JSON.parse(JSON.stringify(state.workers));
+    const prevPresencas = JSON.parse(JSON.stringify(state.presencas));
     state.workers = state.workers.filter(x => x.id !== id);
     state.presencas = state.presencas.filter(p => p.workerId !== id);
-    await save('workers');
-    await save('presencas');
+    try {
+      await saveMany(['workers','presencas']);
+    } catch(e){
+      state.workers = prevWorkers;
+      state.presencas = prevPresencas;
+      _warn('Falha ao eliminar trabalhador. Alterações revertidas em memória.');
+      return;
+    }
     closeModal(true);
     renderView();
   }, { okLabel: 'Eliminar', cancelLabel: 'Cancelar' });
@@ -3205,7 +3948,7 @@ function exportarFolhaDias(){
         </div>
       </div>
       <div class="flex justify-end gap-2">
-        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
         <button class="btn btn-primary" onclick="_doExportarDias()">📥 Descarregar CSV</button>
       </div>
     </div>
@@ -3305,35 +4048,256 @@ function _csvCell(v){
 
 // ============ 17. ORÇAMENTOS ============
 
-function _ensureOrcStorage(){ if(!Array.isArray(state.orcamentos)) state.orcamentos = []; }
+function _ensureOrcStorage(){
+  if(!Array.isArray(state.orcamentos)) state.orcamentos = [];
+  const validStates = ORC_ESTADOS.map(e => e[0]);
+  state.orcamentos.forEach(o => {
+    normalizeOrcItems(o);
+    if(!o.estado) o.estado = 'rascunho';
+    if(o.estado === 'aprovado') o.estado = 'aceite';
+    if(o.estado === 'convertido_obra') o.estado = 'convertido';
+    if(!validStates.includes(o.estado)) o.estado = 'rascunho';
+    if(!o.validade) o.validade = 30;
+    if(o.obraId === undefined) o.obraId = '';
+  });
+}
 
 const orcLabel = (o) => 'ORC-' + String(o.numero||0).padStart(2,'0') + '-' + String(o.ano||currentYear()).slice(-2);
 const nextOrcNumForYear = (ano) => (state.orcamentos.filter(o=>Number(o.ano)===Number(ano)).reduce((m,o)=>Math.max(m, Number(o.numero)||0), 0)) + 1;
+function orcamentoById(id){ return state.orcamentos.find(x => x.id === id) || null; }
+function obraById(id){ return state.obras.find(x => x.id === id) || null; }
+function orcObra(o){
+  if(!o) return null;
+  if(o.obraId){
+    const direct = obraById(o.obraId);
+    if(direct) return direct;
+  }
+  return state.obras.find(ob => ob.orcamentoId === o.id) || null;
+}
+function orcObraBadge(o){
+  const obra = orcObra(o);
+  return obra
+    ? `<button class="btn btn-ghost" onclick="event.stopPropagation();openObra('${obra.id}')">🔨 Obra ${obraLabel(obra)}</button>`
+    : '<span class="badge badge-neutral">—</span>';
+}
+function orcTotalComIva(o){
+  const sub = orcSubtotal(o);
+  return sub * (1 + (Number(o.iva)||23)/100);
+}
+function orcNormalizaTxt(v){
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function catalogInventoryId(c){
+  return c && (c.inventoryId || c.inventarioId || c.stockId || c.itemInventarioId || '');
+}
+function findInventarioParaOrcItem(it){
+  const c = it.catalogId ? state.catalog.find(x => x.id === it.catalogId) : null;
+  const directId = catalogInventoryId(c);
+  if(directId){
+    const inv = inventarioById(directId);
+    if(inv) return inv;
+  }
+  const ref = c && c.ref ? orcNormalizaTxt(c.ref) : '';
+  if(ref){
+    const byRef = state.inventory.find(inv => orcNormalizaTxt(inv.ref || inv.referencia || inv.codigo || '') === ref);
+    if(byRef) return byRef;
+  }
+  const nomes = [];
+  if(c){
+    nomes.push(c.nome, c.designacao, c.tecnologia, catalogDesc(c));
+  }
+  nomes.push(it.descricao);
+  const keys = nomes.map(orcNormalizaTxt).filter(Boolean);
+  if(!keys.length) return null;
+  return state.inventory.find(inv => {
+    const invNome = orcNormalizaTxt(inv.nome || inv.designacao || '');
+    if(!invNome) return false;
+    return keys.some(k => invNome === k || (k.length >= 6 && invNome.includes(k)) || (invNome.length >= 6 && k.includes(invNome)));
+  }) || null;
+}
+function orcDescricaoParaObra(o){
+  const cl = o.clienteId ? state.clients.find(c => c.id === o.clienteId) : null;
+  const linhas = [];
+  linhas.push('OBRA CRIADA A PARTIR DE ORÇAMENTO');
+  linhas.push('');
+  linhas.push('Orçamento: ' + orcLabel(o));
+  if(cl || o.clienteNome) linhas.push('Cliente: ' + (cl ? cl.nome : o.clienteNome));
+  if(o.data) linhas.push('Data do orçamento: ' + fmtDate(o.data));
+  const limite = orcValidadeData(o);
+  if(limite) linhas.push('Validade do orçamento: ' + fmtDate(limite));
+  linhas.push('Valor aprovado: ' + fmt(orcTotalComIva(o)) + ' c/ IVA');
+  if(o.descricao) linhas.push('', 'Resumo:', o.descricao);
+  const itens = (o.itens||[]).filter(it => (it.descricao||'').trim());
+  if(itens.length){
+    linhas.push('', 'Materiais / serviços previstos:');
+    itens.forEach((it, idx) => {
+      const qtd = Number(it.quantidade||0);
+      const un = it.unidade || 'un';
+      const desc = it.descricao || '';
+      const total = orcLineTotal(it);
+      const desconto = Number(it.desconto||0) ? ` · desc. ${Number(it.desconto||0)}%` : '';
+      linhas.push(`${idx+1}. ${desc} — ${qtd} ${un} × ${fmt(it.precoUnit||0)}${desconto} = ${fmt(total)}`);
+    });
+  }
+  if(o.condicoes) linhas.push('', 'Condições:', o.condicoes);
+  return linhas.join('\n');
+}
+function orcItensInventarioParaObra(o){
+  const rows = [];
+  const seen = new Set();
+  (o.itens||[]).forEach(it => {
+    const inv = findInventarioParaOrcItem(it);
+    const qtd = Number(it.quantidade || 0);
+    if(!inv || qtd <= 0) return;
+    const key = inv.id;
+    const existing = rows.find(r => r.inventoryId === key);
+    if(existing){
+      existing.quantidade += qtd;
+      return;
+    }
+    rows.push({
+      id: uid(),
+      inventoryId: inv.id,
+      nome: inv.nome || it.descricao || '',
+      unidade: inv.unidade || it.unidade || 'un',
+      quantidade: qtd,
+      precoUnitario: Number(inv.precoUnitario || it.precoUnit || 0),
+      origemOrcamentoItem: it.catalogId || ''
+    });
+    seen.add(key);
+  });
+  return rows;
+}
+function orcMateriaisParaObra(o){
+  return (o.itens||[]).filter(it => (it.descricao||'').trim()).map(it => ({
+    designacao: it.descricao || '',
+    marca: '',
+    ref: '',
+    quantidade: Number(it.quantidade || 0),
+    unidade: it.unidade || 'un',
+    precoUnit: Number(it.precoUnit || 0),
+    desconto: Number(it.desconto || 0),
+    catalogId: it.catalogId || ''
+  }));
+}
+function orcamentoJaConvertido(o){
+  if(!o) return false;
+  return !!(orcObra(o) || o.obraId || o.estado === 'convertido');
+}
 
 const ORC_ESTADOS = [
   ['rascunho','📝 Rascunho'],
   ['enviado','📤 Enviado'],
   ['aceite','✅ Aceite'],
   ['recusado','❌ Recusado'],
+  ['expirado','⏰ Expirado'],
+  ['convertido','🔨 Convertido em obra'],
 ];
+const ORC_ESTADO_CLASSES = {
+  rascunho:'badge-neutral',
+  enviado:'badge-blue',
+  aceite:'badge-green',
+  recusado:'badge-red',
+  expirado:'badge-warn',
+  convertido:'badge-ok'
+};
+const ORC_ESTADOS_FINAIS = ['aceite','recusado','convertido'];
+function orcValidadeData(o){
+  if(!o || !o.data) return '';
+  try {
+    const d = new Date(o.data + 'T00:00:00');
+    d.setDate(d.getDate() + (Number(o.validade)||30));
+    return d.toISOString().slice(0,10);
+  } catch(e){ return ''; }
+}
+function orcEstadoKey(o){
+  if(!o) return 'rascunho';
+  const raw = o.estado || 'rascunho';
+  if(raw === 'expirado') return 'expirado';
+  if(!ORC_ESTADOS_FINAIS.includes(raw)){
+    const limite = orcValidadeData(o);
+    if(limite && limite < today()) return 'expirado';
+  }
+  return ORC_ESTADOS.some(e=>e[0]===raw) ? raw : 'rascunho';
+}
+function orcEstadoLabel(key){
+  const est = ORC_ESTADOS.find(e=>e[0]===key) || ORC_ESTADOS[0];
+  return est[1];
+}
+function orcEstadoBadge(o){
+  const key = typeof o === 'string' ? o : orcEstadoKey(o);
+  return `<span class="badge ${ORC_ESTADO_CLASSES[key]||'badge-neutral'}">${orcEstadoLabel(key)}</span>`;
+}
+function setOrcamentosFilter(filtro){
+  window._orcEstadoFilter = filtro || 'todos';
+  renderView();
+}
+
+function catalogUnit(c){
+  return (c && (c.unidade || c.un || c.medida)) || 'un';
+}
+function catalogPrice(c){
+  if(!c) return 0;
+  return Number(c.precoUnit ?? c.precoUnitario ?? c.preco ?? c.valor ?? 0) || 0;
+}
+function catalogDesc(c){
+  if(!c) return '';
+  let nome = c.tecnologia || c.designacao || c.nome || '';
+  const extra = [];
+  if(c.marca) extra.push(c.marca);
+  if(c.ref) extra.push('Ref: ' + c.ref);
+  return extra.length ? nome + ' — ' + extra.join(' · ') : nome;
+}
+function orcLineTotal(it){
+  const bruto = (Number(it.quantidade)||0) * (Number(it.precoUnit)||0);
+  const desconto = Math.max(0, Math.min(100, Number(it.desconto)||0));
+  return bruto * (1 - desconto/100);
+}
+function orcSubtotal(o){
+  return (o.itens||[]).reduce((s,it)=> s + orcLineTotal(it), 0);
+}
+function normalizeOrcItems(o){
+  if(!Array.isArray(o.itens)) o.itens = [];
+  o.itens = o.itens.map(it => ({
+    descricao: it.descricao || '',
+    unidade: it.unidade || 'un',
+    quantidade: Number(it.quantidade)||0,
+    precoUnit: Number(it.precoUnit)||0,
+    desconto: Number(it.desconto)||0,
+    catalogId: it.catalogId || ''
+  }));
+}
 
 function viewOrcamentos(){
   _ensureOrcStorage();
-  const orcs = state.orcamentos.slice().sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  const filtro = window._orcEstadoFilter || 'todos';
+  const all = state.orcamentos.slice().sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  const counts = {todos: all.length};
+  ORC_ESTADOS.forEach(e => counts[e[0]] = 0);
+  all.forEach(o => { counts[orcEstadoKey(o)] = (counts[orcEstadoKey(o)] || 0) + 1; });
+  const orcs = filtro === 'todos' ? all : all.filter(o => orcEstadoKey(o) === filtro);
+
+  const filterButtons = [['todos','📋 Todos'], ...ORC_ESTADOS].map(([key,label]) => `
+    <button class="btn ${filtro===key?'btn-primary':'btn-ghost'}" onclick="setOrcamentosFilter('${key}')">
+      ${label} <span class="badge ${filtro===key?'badge-neutral':(ORC_ESTADO_CLASSES[key]||'badge-neutral')}" style="margin-left:2px;">${counts[key]||0}</span>
+    </button>
+  `).join('');
 
   const rows = orcs.length === 0
-    ? '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px;">Sem orçamentos. Crie o primeiro.</td></tr>'
+    ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px;">Sem orçamentos neste estado.</td></tr>'
     : orcs.map(o => {
         const cl = state.clients.find(c=>c.id===o.clienteId);
-        const est = ORC_ESTADOS.find(e=>e[0]===o.estado) || ORC_ESTADOS[0];
-        const sub = o.itens.reduce((s,it)=> s + (it.quantidade||0)*(it.precoUnit||0), 0);
+        const sub = orcSubtotal(o);
         const total = sub * (1 + (o.iva||23)/100);
+        const limite = orcValidadeData(o);
         return `<tr onclick="viewOrcamento('${o.id}')" style="cursor:pointer;">
           <td><strong style="color:var(--accent);">${orcLabel(o)}</strong></td>
           <td>${fmtDate(o.data)}</td>
+          <td>${limite ? fmtDate(limite) : '—'}</td>
           <td>${escapeHtml(cl ? cl.nome : o.clienteNome || '—')}</td>
           <td>${escapeHtml((o.descricao||'').slice(0,50))}</td>
-          <td style="text-align:center;"><span class="badge ${o.estado==='aceite'?'badge-green':o.estado==='recusado'?'badge-red':o.estado==='enviado'?'badge-blue':'badge-neutral'}">${est[1]}</span></td>
+          <td style="text-align:center;">${orcEstadoBadge(o)}</td>
+          <td style="text-align:center;">${orcObraBadge(o)}</td>
           <td style="text-align:right;font-weight:600;">${fmt(total)}</td>
         </tr>`;
       }).join('');
@@ -3342,13 +4306,16 @@ function viewOrcamentos(){
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <h2 class="text-2xl font-bold">📋 Orçamentos</h2>
-      <p class="text-sm" style="color:var(--muted);">${state.orcamentos.length} orçamento(s)</p>
+      <p class="text-sm" style="color:var(--muted);">${state.orcamentos.length} orçamento(s) · ${counts.enviado||0} enviado(s) · ${counts.aceite||0} aceite(s) · ${counts.expirado||0} expirado(s)</p>
     </div>
     <button class="btn btn-accent" onclick="editOrcamento()">+ Novo Orçamento</button>
   </div>
+  <div class="card p-4 mb-4">
+    <div class="flex gap-2 flex-wrap">${filterButtons}</div>
+  </div>
   <div class="card">
     <table>
-      <thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Descrição</th><th style="text-align:center;">Estado</th><th style="text-align:right;">Total c/ IVA</th></tr></thead>
+      <thead><tr><th>Nº</th><th>Data</th><th>Validade até</th><th>Cliente</th><th>Descrição</th><th style="text-align:center;">Estado</th><th style="text-align:center;">Obra</th><th style="text-align:right;">Total c/ IVA</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
@@ -3359,10 +4326,18 @@ function viewOrcamento(id){
   const o = state.orcamentos.find(x=>x.id===id);
   if(!o) return;
   const cl = state.clients.find(c=>c.id===o.clienteId);
-  const est = ORC_ESTADOS.find(e=>e[0]===o.estado) || ORC_ESTADOS[0];
-  const sub = o.itens.reduce((s,it)=> s + (it.quantidade||0)*(it.precoUnit||0), 0);
+  const estadoKey = orcEstadoKey(o);
+  const sub = orcSubtotal(o);
   const ivaVal = sub * (o.iva||23)/100;
   const total = sub + ivaVal;
+  const limite = orcValidadeData(o);
+  const linkedObra = orcObra(o);
+  const jaConvertido = orcamentoJaConvertido(o);
+  const converterBtn = linkedObra
+    ? `<button class="btn btn-primary" onclick="openObra('${linkedObra.id}')">🔨 Abrir Obra ${obraLabel(linkedObra)}</button>`
+    : (jaConvertido
+        ? `<span class="badge badge-warn">Já convertido · obra não encontrada</span>`
+        : `<button class="btn btn-ok" onclick="converterOrcamentoEmObra('${o.id}')">✅ Converter em Obra</button>`);
 
   const itensHtml = o.itens.map((it,i) => `
     <tr>
@@ -3371,24 +4346,31 @@ function viewOrcamento(id){
       <td style="text-align:center;">${escapeHtml(it.unidade||'un')}</td>
       <td style="text-align:center;">${it.quantidade||0}</td>
       <td style="text-align:right;">${fmt(it.precoUnit||0)}</td>
-      <td style="text-align:right;font-weight:600;">${fmt((it.quantidade||0)*(it.precoUnit||0))}</td>
+      <td style="text-align:center;">${Number(it.desconto||0) ? Number(it.desconto||0) + '%' : '—'}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(orcLineTotal(it))}</td>
     </tr>
   `).join('');
+
+  const acoesEstado = ORC_ESTADOS.filter(e=>e[0]!==estadoKey && e[0] !== 'convertido').map(e=>
+    `<button class="btn btn-ghost" onclick="setOrcEstado('${o.id}','${e[0]}')">${e[1]}</button>`
+  ).join('');
 
   openModal(`
   <div class="p-6">
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-      <h2 class="text-2xl font-bold">${orcLabel(o)} <span class="badge ${o.estado==='aceite'?'badge-green':o.estado==='recusado'?'badge-red':o.estado==='enviado'?'badge-blue':'badge-neutral'}">${est[1]}</span></h2>
+      <h2 class="text-2xl font-bold">${orcLabel(o)} ${orcEstadoBadge(o)}</h2>
       <div class="flex gap-2 flex-wrap">
         <button class="btn btn-ghost" onclick="editOrcamento('${o.id}')">✏️ Editar</button>
+        ${converterBtn}
         <button class="btn btn-ghost" onclick="duplicarOrcamento('${o.id}')">📄 Duplicar</button>
         <button class="btn btn-accent" onclick="exportOrcamentoExcel('${o.id}')">📊 Exportar Excel</button>
-        <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+        <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
       </div>
     </div>
-    <div class="grid-2 mb-4">
+    <div class="grid-3 mb-4">
       <div class="section-box"><div class="label">Data</div><div class="mt-1 font-semibold">${fmtDate(o.data)}</div></div>
-      <div class="section-box"><div class="label">Validade</div><div class="mt-1 font-semibold">${o.validade||30} dias</div></div>
+      <div class="section-box"><div class="label">Validade</div><div class="mt-1 font-semibold">${o.validade||30} dias</div><div class="text-xs mt-1" style="color:var(--muted);">até ${limite ? fmtDate(limite) : '—'}</div></div>
+      <div class="section-box"><div class="label">Estado atual</div><div class="mt-1">${orcEstadoBadge(o)}</div>${estadoKey==='expirado' && o.estado !== 'expirado' ? '<div class="text-xs mt-1" style="color:var(--warn);">Expirou automaticamente pela data de validade.</div>' : ''}</div>
     </div>
     <div class="section-box mb-4">
       <div class="label">Cliente</div>
@@ -3396,10 +4378,20 @@ function viewOrcamento(id){
       ${o.clienteNif ? `<div class="text-sm" style="color:var(--muted);">NIF: ${escapeHtml(o.clienteNif)}</div>` : ''}
       ${o.clienteMorada ? `<div class="text-sm" style="color:var(--muted);">${escapeHtml(o.clienteMorada)}</div>` : ''}
     </div>
+    <div class="section-box mb-4" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div class="label">Ligação à Obra</div>
+        ${linkedObra
+          ? `<div class="font-semibold mt-1">Convertido na <span class="obra-num">Obra ${obraLabel(linkedObra)}</span></div><div class="text-xs mt-1" style="color:var(--muted);">A obra guarda referência a este orçamento.</div>`
+          : `<div class="font-semibold mt-1" style="color:var(--muted);">Ainda não convertido em obra</div>`
+        }
+      </div>
+      ${converterBtn}
+    </div>
     ${o.descricao ? `<div class="section-box mb-4"><div class="label">Descrição / Assunto</div><div class="mt-1" style="white-space:pre-wrap;">${escapeHtml(o.descricao)}</div></div>` : ''}
     <div class="card mb-4">
       <table>
-        <thead><tr><th style="width:40px;">#</th><th>Descrição</th><th style="text-align:center;">Un.</th><th style="text-align:center;">Qtd.</th><th style="text-align:right;">Preço Un.</th><th style="text-align:right;">Total</th></tr></thead>
+        <thead><tr><th style="width:40px;">#</th><th>Descrição</th><th style="text-align:center;">Un.</th><th style="text-align:center;">Qtd.</th><th style="text-align:right;">Preço Un.</th><th style="text-align:center;">Desc.</th><th style="text-align:right;">Total</th></tr></thead>
         <tbody>${itensHtml}</tbody>
       </table>
       <div style="border-top:2px solid var(--line);padding:12px 16px;">
@@ -3410,22 +4402,131 @@ function viewOrcamento(id){
     </div>
     ${o.condicoes ? `<div class="section-box mb-4"><div class="label">Condições</div><div class="mt-1 text-sm" style="white-space:pre-wrap;">${escapeHtml(o.condicoes)}</div></div>` : ''}
     ${o.notas ? `<div class="section-box mb-4"><div class="label">Notas</div><div class="mt-1 text-sm" style="white-space:pre-wrap;">${escapeHtml(o.notas)}</div></div>` : ''}
-    <div class="flex justify-between mt-5">
+    <div class="flex justify-between mt-5 flex-wrap gap-2">
       <button class="btn btn-danger" onclick="deleteOrcamento('${o.id}')">🗑 Eliminar</button>
-      <div class="flex gap-2">
-        ${ORC_ESTADOS.filter(e=>e[0]!==o.estado).map(e=>`<button class="btn btn-ghost" onclick="setOrcEstado('${o.id}','${e[0]}')">${e[1]}</button>`).join('')}
-      </div>
+      <div class="flex gap-2 flex-wrap">${acoesEstado}</div>
     </div>
   </div>
   `);
 }
 
 async function setOrcEstado(id, estado){
+  if(estado === 'convertido'){ converterOrcamentoEmObra(id); return; }
   const o = state.orcamentos.find(x=>x.id===id);
   if(!o) return;
   o.estado = estado;
+  if(estado === 'enviado') o.dataEnvio = today();
+  if(estado === 'aceite') o.dataAceite = today();
+  if(estado === 'recusado') o.dataRecusa = today();
+  if(estado === 'expirado') o.dataExpirado = today();
+  if(estado === 'convertido') o.dataConvertido = today();
   await save('orcamentos');
   viewOrcamento(id);
+}
+
+async function _converterOrcamentoEmObraNow(id){
+  if(window._saving) return;
+  window._saving = true;
+  const prevObras = JSON.parse(JSON.stringify(state.obras));
+  const prevOrcamentos = JSON.parse(JSON.stringify(state.orcamentos));
+  try {
+    _ensureOrcStorage();
+    const o = state.orcamentos.find(x=>x.id===id);
+    if(!o){ alert('Orçamento não encontrado.'); return; }
+    const existente = orcObra(o);
+    if(existente){ openObra(existente.id); return; }
+    if(orcamentoJaConvertido(o)){
+      alert('Este orçamento já foi convertido em obra.');
+      viewOrcamento(id);
+      return;
+    }
+    normalizeOrcItems(o);
+    const ano = currentYear();
+    const obraId = uid();
+    const itensInventario = orcItensInventarioParaObra(o);
+    const novaObra = normalizeObraForSave({
+      id: obraId,
+      numero: nextObraNumForYear(ano),
+      ano,
+      clienteId: o.clienteId || '',
+      data: today(),
+      dataConclusao: '',
+      descricao: orcDescricaoParaObra(o),
+      observacoes: 'Criada automaticamente a partir do orçamento ' + orcLabel(o),
+      valor: orcTotalComIva(o),
+      valorPago: 0,
+      dataPagamento: '',
+      pagamentos: [],
+      estado: 'em_curso',
+      incluiFichaIted: false,
+      incluiFichaItur: false,
+      refId: '',
+      instalador: {nome:'',nif:'',numero:''},
+      itur: {morada:'',codPostal:'',localidade:'',coordenadas:'',manualIted:''},
+      cabos: [],
+      materiais: orcMateriaisParaObra(o),
+      docObrig: {ensaios:false,calibracao:false,projeto:false},
+      docFacult: '',
+      equipamentosUsados: [],
+      itensInventario,
+      stockReservado: false,
+      stockReservadoEm: '',
+      stockBaixado: false,
+      stockBaixadoEm: '',
+      ficheiros: {cobre:[], coaxial:[], fibra:[], fotos:[], outros:[]},
+      orcamentoId: o.id
+    });
+
+    let reservaMsg = '';
+    if(itensInventario.length > 0){
+      const reserva = validarReservaStockObra(novaObra);
+      if(reserva.problemas.length === 0){
+        novaObra.stockReservado = true;
+        novaObra.stockReservadoEm = today();
+        reservaMsg = 'Stock reservado automaticamente.';
+      } else {
+        reservaMsg = 'A obra foi criada, mas o stock não foi reservado automaticamente:\n' + reserva.problemas.join('\n');
+      }
+    } else {
+      reservaMsg = 'A obra foi criada. Nenhum item do orçamento correspondeu ao inventário para reserva automática.';
+    }
+
+    state.obras.push(novaObra);
+    o.obraId = obraId;
+    o.estado = 'convertido';
+    o.dataConvertido = today();
+    await saveMany(['obras','orcamentos']);
+    clearDirty();
+    if(reservaMsg) alert(reservaMsg);
+    openObra(obraId);
+  } catch(e){
+    state.obras = prevObras;
+    state.orcamentos = prevOrcamentos;
+    alert('Erro ao converter orçamento em obra: ' + e.message);
+    console.error('converterOrcamentoEmObra failed:', e);
+  } finally { window._saving = false; }
+}
+
+function converterOrcamentoEmObra(id){
+  const o = state.orcamentos.find(x=>x.id===id);
+  if(!o) return;
+  const existente = orcObra(o);
+  if(existente){ openObra(existente.id); return; }
+  if(orcamentoJaConvertido(o)){
+    alert('Este orçamento já foi convertido em obra.');
+    viewOrcamento(id);
+    return;
+  }
+  const invCount = orcItensInventarioParaObra(o).length;
+  confirmAction(
+    `Converter o orçamento ${orcLabel(o)} em obra?
+
+Será criada uma nova obra com o próximo número disponível, ficará associada a este orçamento, copiará os itens para a obra e tentará reservar stock automaticamente.
+
+Itens com ligação ao inventário encontrados: ${invCount}`,
+    () => _converterOrcamentoEmObraNow(id),
+    {okLabel:'✅ Converter em Obra', cancelLabel:'Cancelar', okStyle:'background:var(--ok);color:#fff;'}
+  );
 }
 
 function editOrcamento(id){
@@ -3442,14 +4543,17 @@ function editOrcamento(id){
       clienteId: '',
       clienteNome: '', clienteNif: '', clienteMorada: '', clienteContacto: '',
       descricao: '',
-      itens: [{descricao:'', unidade:'un', quantidade:1, precoUnit:0, catalogId:''}],
+      itens: [{descricao:'', unidade:'un', quantidade:1, precoUnit:0, desconto:0, catalogId:''}],
       iva: 23,
       condicoes: 'Pagamento a 30 dias.',
       notas: '',
-      estado: 'rascunho'
+      estado: 'rascunho',
+      obraId: ''
     };
     window._editingOrcId = null;
   }
+  normalizeOrcItems(window._editingOrc);
+  if(window._editingOrc.itens.length === 0) window._editingOrc.itens.push({descricao:'', unidade:'un', quantidade:1, precoUnit:0, desconto:0, catalogId:''});
   _renderOrcModal();
 }
 
@@ -3457,6 +4561,7 @@ function _renderOrcModal(){
   const o = window._editingOrc;
   const clienteOpts = '<option value="">— Selecionar cliente —</option>' +
     state.clients.map(c => `<option value="${c.id}" ${o.clienteId===c.id?'selected':''}>${escapeHtml(c.nome)}</option>`).join('');
+  const estadoOpts = ORC_ESTADOS.map(([v,l]) => `<option value="${v}" ${o.estado===v?'selected':''}>${l}</option>`).join('');
 
   const itensHtml = o.itens.map((it,i) => `
     <div class="flex gap-2 mb-2 items-start flex-wrap" style="padding:8px;background:${i%2===0?'var(--bg)':'transparent'};border-radius:8px;">
@@ -3470,13 +4575,14 @@ function _renderOrcModal(){
       </div>
       <div style="width:70px;"><input class="input" style="text-align:center;" value="${escapeAttr(it.unidade||'un')}" oninput="window._editingOrc.itens[${i}].unidade=this.value" placeholder="un"></div>
       <div style="width:80px;"><input class="input" type="number" min="0" step="1" style="text-align:center;" value="${it.quantidade||0}" oninput="window._editingOrc.itens[${i}].quantidade=+this.value; _updateOrcTotals()"></div>
-      <div style="width:110px;"><input class="input" type="number" min="0" step="0.01" value="${it.precoUnit||0}" oninput="window._editingOrc.itens[${i}].precoUnit=+this.value; _updateOrcTotals()"></div>
-      <div style="width:100px;text-align:right;padding-top:10px;font-weight:600;" id="orc-line-total-${i}">${fmt((it.quantidade||0)*(it.precoUnit||0))}</div>
+      <div style="width:110px;"><input class="input" type="number" min="0" step="0.01" value="${it.precoUnit||0}" oninput="window._editingOrc.itens[${i}].precoUnit=+this.value; _updateOrcTotals()" placeholder="Preço"></div>
+      <div style="width:78px;"><input class="input" type="number" min="0" max="100" step="0.01" style="text-align:center;" value="${it.desconto||0}" oninput="window._editingOrc.itens[${i}].desconto=+this.value; _updateOrcTotals()" title="Desconto %"></div>
+      <div style="width:100px;text-align:right;padding-top:10px;font-weight:600;" id="orc-line-total-${i}">${fmt(orcLineTotal(it))}</div>
       <button class="icon-btn" onclick="removeOrcItem(${i})" style="color:var(--danger);padding-top:8px;" title="Remover">✕</button>
     </div>
   `).join('');
 
-  const sub = o.itens.reduce((s,it)=> s + (it.quantidade||0)*(it.precoUnit||0), 0);
+  const sub = orcSubtotal(o);
   const ivaVal = sub * (o.iva||23)/100;
   const total = sub + ivaVal;
 
@@ -3484,9 +4590,9 @@ function _renderOrcModal(){
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-2xl font-bold">${window._editingOrcId ? 'Editar' : 'Novo'} Orçamento</h2>
-      <button class="icon-btn text-xl" onclick="closeModal()">✕</button>
+      <button class="icon-btn text-xl" onclick="closeModal(true)">✕</button>
     </div>
-    <div class="grid-2 mb-3">
+    <div class="grid-3 mb-3">
       <div class="grid-2">
         <div><label class="label">Nº</label><input class="input" id="orc-numero" type="number" value="${o.numero}"></div>
         <div><label class="label">Ano</label><input class="input" id="orc-ano" value="${o.ano}"></div>
@@ -3495,6 +4601,7 @@ function _renderOrcModal(){
         <div><label class="label">Data</label><input class="input" type="date" id="orc-data" value="${o.data||today()}"></div>
         <div><label class="label">Validade (dias)</label><input class="input" type="number" id="orc-validade" value="${o.validade||30}"></div>
       </div>
+      <div><label class="label">Estado</label><select class="select" id="orc-estado">${estadoOpts}</select></div>
     </div>
 
     <div class="mb-3">
@@ -3522,11 +4629,12 @@ function _renderOrcModal(){
       <div style="width:70px;text-align:center;">Un.</div>
       <div style="width:80px;text-align:center;">Qtd.</div>
       <div style="width:110px;text-align:center;">Preço Un.</div>
+      <div style="width:78px;text-align:center;">Desc. %</div>
       <div style="width:100px;text-align:right;">Total</div>
       <div style="width:28px;"></div>
     </div>
     <div id="orc-itens-container">${itensHtml}</div>
-    <button class="btn btn-ghost mt-2" onclick="addOrcItem()">+ Adicionar linha</button>
+    <div class="flex gap-2 mt-2 flex-wrap"><button class="btn btn-accent" onclick="openOrcCatalogPicker()">+ Adicionar do Catálogo</button><button class="btn btn-ghost" onclick="addOrcItem()">+ Linha manual</button></div>
 
     <div style="border-top:2px solid var(--line);margin-top:16px;padding-top:12px;">
       <div class="flex justify-between text-sm"><span>Subtotal</span><span id="orc-subtotal">${fmt(sub)}</span></div>
@@ -3543,7 +4651,7 @@ function _renderOrcModal(){
     </div>
 
     <div class="flex justify-end gap-2 mt-5">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
       <button class="btn btn-primary" onclick="saveOrcamento()">Guardar Orçamento</button>
     </div>
   </div>
@@ -3552,7 +4660,7 @@ function _renderOrcModal(){
 
 function _updateOrcTotals(){
   const o = window._editingOrc;
-  const sub = o.itens.reduce((s,it)=> s + (it.quantidade||0)*(it.precoUnit||0), 0);
+  const sub = orcSubtotal(o);
   const ivaVal = sub * (o.iva||23)/100;
   const total = sub + ivaVal;
   const elSub = document.getElementById('orc-subtotal');
@@ -3563,7 +4671,7 @@ function _updateOrcTotals(){
   if(elTotal) elTotal.textContent = fmt(total);
   o.itens.forEach((it,i) => {
     const el = document.getElementById('orc-line-total-' + i);
-    if(el) el.textContent = fmt((it.quantidade||0)*(it.precoUnit||0));
+    if(el) el.textContent = fmt(orcLineTotal(it));
   });
 }
 
@@ -3582,7 +4690,7 @@ function onOrcClienteChange(clienteId){
 
 function addOrcItem(){
   _syncOrcFromForm();
-  window._editingOrc.itens.push({descricao:'', unidade:'un', quantidade:1, precoUnit:0, catalogId:''});
+  window._editingOrc.itens.push({descricao:'', unidade:'un', quantidade:1, precoUnit:0, desconto:0, catalogId:''});
   _renderOrcModal();
 }
 function removeOrcItem(idx){
@@ -3603,14 +4711,15 @@ function onOrcItemSearch(idx, val){
   }).slice(0, 8);
   if(cats.length === 0){ box.style.display = 'none'; return; }
   box.innerHTML = cats.map(c => {
-    const nome = c.tecnologia || c.designacao || '';
+    const nome = c.tecnologia || c.designacao || c.nome || '';
     const sub = [c.marca, c.ref].filter(Boolean).join(' · ');
+    const preco = catalogPrice(c);
     const badge = c.tipo === 'cabo'
       ? '<span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:9px;">Cabo</span>'
       : '<span class="badge badge-blue" style="font-size:9px;">Material</span>';
     return `<div onmousedown="pickOrcItem(${idx},'${c.id}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line-soft);" onmouseover="this.style.background='var(--line-soft)'" onmouseout="this.style.background=''">
-      <div style="display:flex;align-items:center;gap:8px;"><strong>${escapeHtml(nome)}</strong> ${badge}</div>
-      <div style="font-size:12px;color:var(--muted);">${escapeHtml(sub)}</div>
+      <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;"><span><strong>${escapeHtml(nome)}</strong> ${badge}</span><strong style="color:var(--accent);">${preco?fmt(preco):''}</strong></div>
+      <div style="font-size:12px;color:var(--muted);">${escapeHtml(sub)}${sub && preco?' · ':''}${preco?escapeHtml(catalogUnit(c)):''}</div>
     </div>`;
   }).join('');
   box.style.display = 'block';
@@ -3623,13 +4732,73 @@ function pickOrcItem(idx, catId){
   const c = state.catalog.find(x=>x.id===catId);
   if(!c) return;
   const it = window._editingOrc.itens[idx];
-  it.descricao = c.tecnologia || c.designacao || '';
+  it.descricao = catalogDesc(c);
   it.catalogId = catId;
-  if(c.marca) it.descricao += ' — ' + c.marca;
-  if(c.ref) it.descricao += ' (Ref: ' + c.ref + ')';
+  it.unidade = catalogUnit(c);
+  it.precoUnit = catalogPrice(c);
+  if(it.desconto === undefined) it.desconto = 0;
   hideOrcSuggest(idx);
   const inp = document.getElementById('orc-item-desc-' + idx);
   if(inp) inp.value = it.descricao;
+  _renderOrcModal();
+}
+
+
+function openOrcCatalogPicker(){
+  _syncOrcFromForm();
+  const items = (state.catalog||[]).slice().sort((a,b) => (catalogDesc(a)||'').localeCompare(catalogDesc(b)||''));
+  const rows = items.length === 0
+    ? '<div class="empty"><div class="empty-icon">📖</div>Catálogo vazio. Adicione artigos no separador Catálogo primeiro.</div>'
+    : items.map(c => {
+        const nome = c.tecnologia || c.designacao || c.nome || 'Artigo sem nome';
+        const sub = [c.marca, c.ref, c.classe].filter(Boolean).join(' · ');
+        const preco = catalogPrice(c);
+        const badge = c.tipo === 'cabo'
+          ? '<span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:9px;">Cabo</span>'
+          : '<span class="badge badge-blue" style="font-size:9px;">Material</span>';
+        return `<div class="card p-3 mb-2 orc-cat-row" data-search="${escapeAttr((nome+' '+sub+' '+catalogUnit(c)).toLowerCase())}" style="cursor:pointer;" onclick="addCatalogItemToOrc('${c.id}')">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="font-semibold">${escapeHtml(nome)} ${badge}</div>
+              <div class="text-xs mt-1" style="color:var(--muted);">${escapeHtml(sub || 'sem marca/ref.')} · ${escapeHtml(catalogUnit(c))}</div>
+            </div>
+            <div class="font-semibold" style="color:var(--accent);">${preco ? fmt(preco) : 'sem preço'}</div>
+          </div>
+        </div>`;
+      }).join('');
+  openModal(`
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <div>
+          <h2 class="text-2xl font-bold">Adicionar do Catálogo</h2>
+          <p class="text-sm" style="color:var(--muted);">Escolha um artigo para entrar no orçamento com unidade e preço automático.</p>
+        </div>
+        <button class="icon-btn text-xl" onclick="_renderOrcModal()">✕</button>
+      </div>
+      <input class="input mb-4" placeholder="Pesquisar artigo, marca ou referência..." oninput="filterOrcCatalogPicker(this.value)">
+      <div id="orc-cat-picker-list" style="max-height:60vh;overflow-y:auto;">${rows}</div>
+      <div class="flex justify-end mt-4"><button class="btn btn-ghost" onclick="_renderOrcModal()">Voltar ao orçamento</button></div>
+    </div>
+  `);
+}
+function filterOrcCatalogPicker(q){
+  q = (q||'').trim().toLowerCase();
+  document.querySelectorAll('#orc-cat-picker-list .orc-cat-row').forEach(el => {
+    el.style.display = !q || (el.dataset.search||'').includes(q) ? '' : 'none';
+  });
+}
+function addCatalogItemToOrc(catId){
+  const c = state.catalog.find(x=>x.id===catId);
+  if(!c) return;
+  window._editingOrc.itens.push({
+    descricao: catalogDesc(c),
+    unidade: catalogUnit(c),
+    quantidade: 1,
+    precoUnit: catalogPrice(c),
+    desconto: 0,
+    catalogId: catId
+  });
+  _renderOrcModal();
 }
 
 function _syncOrcFromForm(){
@@ -3639,6 +4808,7 @@ function _syncOrcFromForm(){
   o.ano = parseInt(val('orc-ano'))||o.ano||currentYear();
   o.data = val('orc-data');
   o.validade = parseInt(val('orc-validade'))||30;
+  o.estado = val('orc-estado') || o.estado || 'rascunho';
   o.clienteId = val('orc-cliente');
   o.clienteNome = val('orc-cl-nome');
   o.clienteNif = val('orc-cl-nif');
@@ -3651,9 +4821,12 @@ function _syncOrcFromForm(){
 }
 
 async function saveOrcamento(){
+  if(window._saving) return; window._saving = true;
   try {
     _syncOrcFromForm();
     const data = window._editingOrc;
+    normalizeOrcItems(data);
+    data.itens = data.itens.filter(it => (it.descricao||'').trim() || Number(it.precoUnit) > 0 || Number(it.quantidade) > 0);
     const id = window._editingOrcId;
     if(!data.itens || data.itens.length === 0){ alert('Adicione pelo menos 1 item.'); return; }
     let finalId = id;
@@ -3663,14 +4836,17 @@ async function saveOrcamento(){
       else state.orcamentos.push({...data, id});
     } else {
       finalId = uid();
+      // Recalcular número para evitar duplicados
+      data.numero = nextOrcNumForYear(data.ano);
       state.orcamentos.push({...data, id:finalId});
     }
     await save('orcamentos');
+    clearDirty();
     closeModal(true);
     renderView();
   } catch(e){
     alert('Erro ao guardar: ' + e.message);
-  }
+  } finally { window._saving = false; }
 }
 
 function deleteOrcamento(id){
@@ -3682,18 +4858,32 @@ function deleteOrcamento(id){
   }, {okLabel:'Eliminar'});
 }
 
-function duplicarOrcamento(id){
+async function duplicarOrcamento(id){
+  if(window._saving) return; window._saving = true;
   _ensureOrcStorage();
-  const orig = state.orcamentos.find(x=>x.id===id);
-  if(!orig) return;
-  const novo = JSON.parse(JSON.stringify(orig));
-  novo.id = uid();
-  novo.numero = nextOrcNumForYear(novo.ano);
-  novo.data = today();
-  novo.estado = 'rascunho';
-  novo.descricao = 'CÓPIA — ' + (novo.descricao||'');
-  state.orcamentos.push(novo);
-  save('orcamentos').then(() => { closeModal(true); editOrcamento(novo.id); });
+  const prevOrcamentos = JSON.parse(JSON.stringify(state.orcamentos || []));
+  try {
+    const orig = state.orcamentos.find(x=>x.id===id);
+    if(!orig) return;
+    const novo = JSON.parse(JSON.stringify(orig));
+    novo.id = uid();
+    novo.numero = nextOrcNumForYear(novo.ano);
+    novo.data = today();
+    novo.estado = 'rascunho';
+    delete novo.dataEnvio; delete novo.dataAceite; delete novo.dataRecusa; delete novo.dataExpirado; delete novo.dataConvertido;
+    novo.obraId = '';
+    novo.descricao = 'CÓPIA — ' + (novo.descricao||'');
+    state.orcamentos.push(novo);
+    await save('orcamentos');
+    closeModal(true);
+    editOrcamento(novo.id);
+  } catch(e){
+    state.orcamentos = prevOrcamentos;
+    console.error('duplicarOrcamento failed:', e);
+    alert('Erro ao duplicar orçamento: ' + e.message);
+  } finally {
+    window._saving = false;
+  }
 }
 
 // === Exportar Excel ===
@@ -3706,7 +4896,7 @@ function exportOrcamentoExcel(id){
   const clMorada = o.clienteMorada || (cl ? cl.morada : '') || '';
   const clContacto = o.clienteContacto || (cl ? cl.contacto : '') || '';
 
-  const sub = o.itens.reduce((s,it)=> s + (it.quantidade||0)*(it.precoUnit||0), 0);
+  const sub = orcSubtotal(o);
   const ivaVal = sub * (o.iva||23)/100;
   const total = sub + ivaVal;
 
@@ -3719,12 +4909,14 @@ function exportOrcamentoExcel(id){
   })();
 
   const itensRows = o.itens.map((it,i) => {
-    const lineTotal = ((it.quantidade||0)*(it.precoUnit||0)).toFixed(2);
+    const lineTotal = orcLineTotal(it).toFixed(2);
+    const desc = Number(it.desconto||0) ? (Number(it.desconto||0).toFixed(2).replace('.00','') + '%') : '—';
     return '<tr><td style="border:1px solid #999;padding:8px;text-align:center;">' + (i+1) +
       '</td><td style="border:1px solid #999;padding:8px;">' + escapeHtml(it.descricao||'—') +
       '</td><td style="border:1px solid #999;padding:8px;text-align:center;">' + escapeHtml(it.unidade||'un') +
       '</td><td style="border:1px solid #999;padding:8px;text-align:center;">' + (it.quantidade||0) +
       '</td><td style="border:1px solid #999;padding:8px;text-align:right;">' + (it.precoUnit||0).toFixed(2) + ' \u20ac' +
+      '</td><td style="border:1px solid #999;padding:8px;text-align:center;">' + desc +
       '</td><td style="border:1px solid #999;padding:8px;text-align:right;font-weight:bold;">' + lineTotal + ' \u20ac</td></tr>';
   }).join('');
 
@@ -3777,6 +4969,7 @@ function exportOrcamentoExcel(id){
   p.push('<th style="border:1px solid #999;padding:10px;width:50px;">Un.</th>');
   p.push('<th style="border:1px solid #999;padding:10px;width:50px;">Qtd.</th>');
   p.push('<th style="border:1px solid #999;padding:10px;width:90px;text-align:right;">Preço Un.</th>');
+  p.push('<th style="border:1px solid #999;padding:10px;width:60px;text-align:center;">Desc.</th>');
   p.push('<th style="border:1px solid #999;padding:10px;width:90px;text-align:right;">Total</th>');
   p.push('</tr></thead><tbody>' + itensRows + '</tbody></table>');
   // Totais
@@ -3806,10 +4999,136 @@ function exportOrcamentoExcel(id){
   a.click();
 }
 
+
+// ============ 17b. UTILIZADORES ============
+function viewUtilizadores(){
+  if(!canManageUsers()) return '<div class="card empty"><div class="empty-icon">🔒</div>Sem permissões para gerir utilizadores.</div>';
+  const totalAtivos = state.users.filter(u => u.ativo !== false).length;
+  return `
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h2 class="text-2xl font-bold">👤 Utilizadores</h2>
+      <p class="text-sm" style="color:var(--muted);">${totalAtivos} ativo(s) · perfis de acesso à app</p>
+    </div>
+    <button class="btn btn-accent" onclick="editUtilizador()">+ Novo Utilizador</button>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Nome</th><th>Utilizador</th><th>Perfil</th><th>Estado</th><th>Criado em</th><th></th></tr></thead>
+      <tbody>
+        ${state.users.map(u => `
+          <tr>
+            <td><strong>${escapeHtml(u.nome||'—')}</strong>${currentUser && currentUser.id===u.id?' <span class="badge badge-blue">Sessão atual</span>':''}</td>
+            <td>${escapeHtml(u.username||'—')}</td>
+            <td>${escapeHtml(ROLE_LABELS[u.role] || u.role || '—')}</td>
+            <td><span class="badge ${u.ativo!==false?'badge-ok':'badge-neutral'}">${u.ativo!==false?'Ativo':'Inativo'}</span></td>
+            <td>${fmtDate(u.criadoEm)}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn btn-ghost" onclick="editUtilizador('${u.id}')" style="padding:5px 10px;font-size:12px;">Editar</button>
+              <button class="btn btn-danger" onclick="deleteUtilizador('${u.id}')" style="padding:5px 10px;font-size:12px;" ${currentUser && currentUser.id===u.id?'disabled title="Não pode eliminar a sessão atual"':''}>🗑</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="card p-4 mt-5" style="background:var(--bg-alt);">
+    <div class="font-semibold mb-1">Perfis nesta versão</div>
+    <div class="text-sm" style="color:var(--ink-soft);line-height:1.6;">
+      <strong>Administrador / Escritório</strong>: acesso total à app, incluindo utilizadores.<br>
+      <strong>Trabalhador</strong>: acesso limitado a Painel, Obras e Trabalhadores/Presenças.
+    </div>
+  </div>`;
+}
+function editUtilizador(id){
+  if(!canManageUsers()) return;
+  const u = id ? state.users.find(x=>x.id===id) : {nome:'',username:'',role:'trabalhador',ativo:true};
+  if(!u) return;
+  openModal(`
+    <div class="p-6">
+      <h2 class="text-2xl font-bold mb-5">${id?'Editar':'Novo'} Utilizador</h2>
+      <div class="grid-2">
+        <div><label class="label">Nome *</label><input class="input" id="u-nome" value="${escapeAttr(u.nome||'')}"></div>
+        <div><label class="label">Utilizador *</label><input class="input" id="u-username" value="${escapeAttr(u.username||'')}" autocomplete="username"></div>
+        <div><label class="label">Perfil</label><select class="select" id="u-role">
+          <option value="admin_escritorio" ${u.role==='admin_escritorio'?'selected':''}>Administrador / Escritório</option>
+          <option value="trabalhador" ${u.role==='trabalhador'?'selected':''}>Trabalhador</option>
+        </select></div>
+        <div><label class="label">Estado</label><select class="select" id="u-ativo">
+          <option value="1" ${u.ativo!==false?'selected':''}>Ativo</option>
+          <option value="0" ${u.ativo===false?'selected':''}>Inativo</option>
+        </select></div>
+      </div>
+      <div class="mt-3"><label class="label">${id?'Nova palavra-passe':'Palavra-passe *'}</label><input class="input" id="u-pass" type="password" autocomplete="new-password" placeholder="${id?'Deixar vazio para manter':'Obrigatória'}"></div>
+      <div class="text-xs mt-2" style="color:var(--muted);">A palavra-passe é guardada em hash no armazenamento local desta app.</div>
+      <div class="flex justify-end gap-2 mt-6">
+        <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveUtilizador('${id||''}')">Guardar</button>
+      </div>
+    </div>`);
+}
+async function saveUtilizador(id){
+  if(window._saving) return; window._saving = true;
+  const prev = JSON.parse(JSON.stringify(state.users));
+  try {
+    if(!canManageUsers()) return;
+    const nome = document.getElementById('u-nome').value.trim();
+    const username = normalizeUsername(document.getElementById('u-username').value);
+    const role = document.getElementById('u-role').value;
+    const ativo = document.getElementById('u-ativo').value === '1';
+    const pass = document.getElementById('u-pass').value;
+    if(!nome){ alert('Nome é obrigatório.'); return; }
+    if(!username){ alert('Utilizador é obrigatório.'); return; }
+    if(!id && !pass){ alert('Palavra-passe é obrigatória para novo utilizador.'); return; }
+    if(state.users.some(u => u.id !== id && normalizeUsername(u.username) === username)){
+      alert('Já existe um utilizador com esse nome de acesso.'); return;
+    }
+    if(id){
+      const i = state.users.findIndex(u=>u.id===id);
+      if(i < 0){ alert('Utilizador não encontrado.'); return; }
+      state.users[i] = {...state.users[i], nome, username, role, ativo};
+      if(pass) state.users[i].passwordHash = await hashPassword(pass);
+      if(currentUser && currentUser.id === id){
+        currentUser = safeUser(state.users[i]);
+        if(!ativo){ await logout(); return; }
+        await saveSession(currentUser);
+      }
+    } else {
+      state.users.push({id:uid(), nome, username, role, ativo, passwordHash:await hashPassword(pass), criadoEm:today()});
+    }
+    await save('users');
+    closeModal(true);
+    renderTabs();
+    renderView();
+  } catch(e){
+    state.users = prev;
+    alert('Erro ao guardar utilizador: ' + e.message);
+    console.error('saveUtilizador failed:', e);
+  } finally { window._saving = false; }
+}
+function deleteUtilizador(id){
+  if(!canManageUsers()) return;
+  if(currentUser && currentUser.id === id){ alert('Não pode eliminar o utilizador da sessão atual.'); return; }
+  const u = state.users.find(x=>x.id===id);
+  if(!u) return;
+  confirmAction('Eliminar o utilizador "' + (u.nome||u.username) + '"?', async () => {
+    const prev = JSON.parse(JSON.stringify(state.users));
+    try {
+      state.users = state.users.filter(x=>x.id!==id);
+      await save('users');
+      closeModal(true);
+      renderView();
+    } catch(e){
+      state.users = prev;
+      alert('Erro ao eliminar utilizador: ' + e.message);
+    }
+  });
+}
+
 // ============ 18. INIT ============
 (async function init(){
   await loadAll();
-  renderTabs();
-  renderView();
+  currentUser = await loadSession();
+  renderAuthGate();
 })();
 </script>
