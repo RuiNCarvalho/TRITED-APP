@@ -3021,26 +3021,442 @@ async function ensureZipDependencies(needPdf, progress){
   return { pdfReady };
 }
 
-function showZipReadyOverlay(overlay, blob, filename){
+const _preparedDownloads = {};
+function _newDownloadId(){ return 'dl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
+function _savePreparedDownload(blob, filename){
+  const id = _newDownloadId();
+  _preparedDownloads[id] = { blob, filename, url: URL.createObjectURL(blob), createdAt: Date.now() };
+  return id;
+}
+function _preparedDownload(id){ return _preparedDownloads[id] || null; }
+function _safeRevokePreparedDownload(id){
+  const d = _preparedDownloads[id];
+  if(!d) return;
+  try { if(d.url) URL.revokeObjectURL(d.url); } catch(e){}
+  delete _preparedDownloads[id];
+}
+function _downloadBlobWithAnchor(blob, filename){
   const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  try { a.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window})); }
+  finally {
+    setTimeout(() => {
+      try { a.remove(); } catch(e){}
+      try { URL.revokeObjectURL(url); } catch(e){}
+    }, 2000);
+  }
+}
+async function downloadPreparedZip(id){
+  const d = _preparedDownload(id);
+  if(!d){ alert('O ZIP já não está disponível. Gere novamente.'); return; }
+  try {
+    if(window.showSaveFilePicker){
+      const handle = await window.showSaveFilePicker({
+        suggestedName: d.filename,
+        types: [{ description: 'ZIP', accept: {'application/zip':['.zip']} }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(d.blob);
+      await writable.close();
+      const st = document.getElementById('zip-alt-status');
+      if(st) st.textContent = 'ZIP guardado com sucesso.';
+      return;
+    }
+  } catch(e){
+    if(e && e.name === 'AbortError') return;
+    console.warn('Guardar com seletor de ficheiros falhou:', e);
+  }
+  try {
+    _downloadBlobWithAnchor(d.blob, d.filename);
+    const st = document.getElementById('zip-alt-status');
+    if(st) st.textContent = 'Pedido de download enviado. Se nada acontecer, use “Abrir ZIP” ou “Copiar Base64”.';
+  } catch(e){
+    alert('Este navegador bloqueou o download. Use “Abrir ZIP” ou “Copiar Base64”.');
+  }
+}
+function openPreparedZip(id){
+  const d = _preparedDownload(id);
+  if(!d){ alert('O ZIP já não está disponível. Gere novamente.'); return; }
+  const win = window.open(d.url, '_blank', 'noopener,noreferrer');
+  const st = document.getElementById('zip-alt-status');
+  if(st) st.textContent = win ? 'ZIP aberto numa nova aba. Use Guardar/Transferir nessa aba.' : 'O navegador bloqueou a nova aba. Use “Copiar Base64”.';
+}
+function _blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('Não foi possível converter o ZIP para Base64.'));
+    r.readAsDataURL(blob);
+  });
+}
+async function copyPreparedZipBase64(id){
+  const d = _preparedDownload(id);
+  if(!d){ alert('O ZIP já não está disponível. Gere novamente.'); return; }
+  const st = document.getElementById('zip-alt-status');
+  const out = document.getElementById('zip-base64-output');
+  try {
+    if(st) st.textContent = 'A preparar Base64...';
+    const b64 = await _blobToBase64(d.blob);
+    if(navigator.clipboard && window.isSecureContext){
+      try {
+        await navigator.clipboard.writeText(b64);
+        if(st) st.textContent = 'Base64 copiado. Para reconstruir: guarde o texto num ficheiro .txt e converta de Base64 para .zip.';
+      } catch(e){
+        if(st) st.textContent = 'Não deu para copiar automaticamente. O texto Base64 ficou na caixa abaixo.';
+      }
+    } else if(st) {
+      st.textContent = 'O texto Base64 ficou na caixa abaixo.';
+    }
+    if(out){
+      out.style.display = 'block';
+      out.value = b64;
+      out.focus();
+      out.select();
+    }
+  } catch(e){ alert(e.message || e); }
+}
+function showZipReadyOverlay(overlay, blob, filename){
+  const id = _savePreparedDownload(blob, filename);
   overlay.className = 'modal-bg';
   overlay.style.zIndex = '90';
   overlay.innerHTML = `
-    <div class="modal" style="max-width:430px;">
+    <div class="modal" style="max-width:520px;">
       <div class="p-6 text-center">
         <div style="font-size:40px;margin-bottom:8px;">✅</div>
         <h3 class="text-xl font-bold mb-2">ZIP pronto</h3>
-        <p class="text-sm mb-4" style="color:var(--muted);line-height:1.5;">Se o download não começou automaticamente, carregue no botão abaixo.</p>
-        <a id="zip-download-link" href="${url}" download="${escapeAttr(filename)}" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 16px;">⬇ Descarregar ZIP</a>
-        <button class="btn btn-ghost mt-3" onclick="this.closest('.modal-bg').remove()" style="width:100%;justify-content:center;">Fechar</button>
+        <p class="text-sm mb-4" style="color:var(--muted);line-height:1.5;">Carregue em <strong>Descarregar ZIP</strong>. Se estiver no preview do ChatGPT e o download for bloqueado, use uma das alternativas.</p>
+        <button class="btn btn-primary" onclick="downloadPreparedZip('${id}')" style="width:100%;justify-content:center;padding:13px 16px;">⬇ Descarregar ZIP</button>
+        <button class="btn btn-ghost mt-3" onclick="openPreparedZip('${id}')" style="width:100%;justify-content:center;">↗ Abrir ZIP noutra aba</button>
+        <button class="btn btn-ghost mt-3" onclick="copyPreparedZipBase64('${id}')" style="width:100%;justify-content:center;">📋 Copiar ZIP em Base64</button>
+        <p id="zip-alt-status" class="text-xs mt-3" style="color:var(--muted);line-height:1.5;">Ficheiro: ${escapeHtml(filename)} · ${(blob.size/1024).toFixed(1)} KB</p>
+        <textarea id="zip-base64-output" readonly style="display:none;width:100%;height:120px;margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;background:var(--bg-alt);color:var(--ink);"></textarea>
+        <button class="btn btn-ghost mt-3" onclick="_safeRevokePreparedDownload('${id}');this.closest('.modal-bg').remove()" style="width:100%;justify-content:center;">Fechar</button>
       </div>
     </div>`;
-  const link = overlay.querySelector('#zip-download-link');
-  if(link){
-    // Auto-download quando o navegador permite; botão fica como alternativa manual.
-    setTimeout(() => { try { link.click(); } catch(e){} }, 120);
+}
+
+
+
+// ============ 10b. Excel (.xlsx) para ZIP ============
+function _xlsxEsc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
+function _xlsxColName(n){
+  let s = '';
+  while(n > 0){
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
   }
-  setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 5 * 60 * 1000);
+  return s;
+}
+function _xlsxCellRef(row, col){ return _xlsxColName(col) + row; }
+function _xlsxSafeSheetName(name, used){
+  let base = String(name || 'Folha').replace(/[\\/\?\*\[\]:]/g,' ').trim() || 'Folha';
+  base = base.slice(0, 31);
+  let finalName = base;
+  let i = 2;
+  used = used || {};
+  while(used[finalName.toLowerCase()]){
+    const suffix = ' ' + i++;
+    finalName = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  used[finalName.toLowerCase()] = true;
+  return finalName;
+}
+function _xlsxStyleXml(){
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="6">
+    <font><sz val="11"/><name val="Calibri"/></font>
+    <font><b/><sz val="18"/><color rgb="FF143F64"/><name val="Calibri"/></font>
+    <font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FF143F64"/><name val="Calibri"/></font>
+    <font><sz val="10"/><color rgb="FF64748B"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FF0F172A"/><name val="Calibri"/></font>
+  </fonts>
+  <fills count="6">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF143F64"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFEAF2F8"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFEFE5"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border><left style="thin"><color rgb="FFD7DFEB"/></left><right style="thin"><color rgb="FFD7DFEB"/></right><top style="thin"><color rgb="FFD7DFEB"/></top><bottom style="thin"><color rgb="FFD7DFEB"/></bottom><diagonal/></border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="7">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="5" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+}
+function _xlsxCellXml(cell, row, col){
+  if(cell === undefined || cell === null || cell === '') return '';
+  let v = cell;
+  let s = 0;
+  if(typeof cell === 'object' && !(cell instanceof Date)){
+    v = cell.v;
+    s = Number(cell.s || 0);
+  }
+  if(v === undefined || v === null) v = '';
+  const ref = _xlsxCellRef(row, col);
+  const style = s ? ` s="${s}"` : '';
+  if(typeof v === 'number' && isFinite(v)) return `<c r="${ref}"${style}><v>${v}</v></c>`;
+  if(typeof v === 'boolean') return `<c r="${ref}" t="b"${style}><v>${v ? 1 : 0}</v></c>`;
+  return `<c r="${ref}" t="inlineStr"${style}><is><t>${_xlsxEsc(v)}</t></is></c>`;
+}
+function _xlsxSheetXml(sheet){
+  const rows = sheet.rows || [];
+  const widths = sheet.widths || [];
+  const colsXml = widths.length ? `<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${Number(w)||14}" customWidth="1"/>`).join('')}</cols>` : '';
+  const sheetData = rows.map((row, rIdx) => {
+    const r = rIdx + 1;
+    const cells = (row || []).map((cell, cIdx) => _xlsxCellXml(cell, r, cIdx + 1)).join('');
+    return `<row r="${r}">${cells}</row>`;
+  }).join('');
+  const filterXml = sheet.autoFilter ? `<autoFilter ref="${_xlsxEsc(sheet.autoFilter)}"/>` : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+  ${colsXml}
+  <sheetData>${sheetData}</sheetData>
+  ${filterXml}
+</worksheet>`;
+}
+async function createXlsxBlob(sheets){
+  const used = {};
+  sheets = (sheets || []).map((s, i) => ({...s, name:_xlsxSafeSheetName(s.name || ('Folha ' + (i+1)), used)}));
+  const zip = createZipEngine();
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  ${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}
+</Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+  const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}
+  <Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+  const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>${sheets.map((s,i)=>`<sheet name="${_xlsxEsc(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets>
+</workbook>`;
+  zip.file('[Content_Types].xml', contentTypes);
+  zip.file('_rels/.rels', rels);
+  zip.file('xl/workbook.xml', workbook);
+  zip.file('xl/_rels/workbook.xml.rels', wbRels);
+  zip.file('xl/styles.xml', _xlsxStyleXml());
+  sheets.forEach((s,i) => zip.file(`xl/worksheets/sheet${i+1}.xml`, _xlsxSheetXml(s)));
+  const raw = await zip.generateAsync({type:'blob'});
+  return new Blob([raw], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function _xlsxDayName(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const names = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  return names[d.getDay()] || '';
+}
+function _xlsxFileSafeName(v){ return String(v || 'ficheiro').replace(/[\\/:*?"<>|]/g,'_').trim(); }
+function buildFichaItedIturWorkbookSheets(o, tipo, cliente){
+  const C = (v,s) => ({v, s:s||0});
+  const cabos = (o.cabos||[]).filter(x=>x.tecnologia||x.marca||x.classe||x.ref);
+  const materiais = (o.materiais||[]).filter(x=>x.designacao||x.marca||x.ref);
+  const mkMarca = x => [x.marca||'', x.ref ? 'Ref. ' + x.ref : ''].filter(Boolean).join(' · ');
+  const fichaRows = [
+    [C('FICHA DE IDENTIFICAÇÕES ' + tipo,1)],
+    [C('Obra',4), 'Obra ' + obraLabel(o), C('Data',4), fmtDate(o.data)],
+    [C('Cliente',4), cliente ? cliente.nome : '—', C('Exportado em',4), fmtDate(today())],
+    [],
+    [C('Dados Gerais',3)],
+    [C('Ref. ID',4), o.refId||'', C('Tipo',4), tipo],
+    [C('Descrição',4), o.descricao||'', C('Valor',4), fmt(o.valor)],
+    [],
+    [C('Instalador',3)],
+    [C('Nome',4), o.instalador?.nome||'', C('NIF',4), o.instalador?.nif||'', C('Nº ANACOM/OE/OET',4), o.instalador?.numero||''],
+    [],
+    [C('Localização',3)],
+    [C('Morada',4), o.itur?.morada||''],
+    [C('Código Postal',4), o.itur?.codPostal||'', C('Localidade',4), o.itur?.localidade||''],
+    [C('Coordenadas',4), o.itur?.coordenadas||'', C('Manual ITED',4), o.itur?.manualIted||'']
+  ];
+  const cabosRows = [[C('Cabos Instalados',1)],[],[C('Tecnologia',2),C('Marca e Modelo',2),C('Referência',2),C('Classe RPC',2)]];
+  (cabos.length ? cabos : [{}]).forEach(x => cabosRows.push([C(x.tecnologia||'',6), C(x.marca||'',6), C(x.ref||'',6), C(x.classe||'',6)]));
+  const matRows = [[C('Materiais e Dispositivos Instalados',1)],[],[C('Designação',2),C('Marca e Modelo',2),C('Referência',2)]];
+  (materiais.length ? materiais : [{}]).forEach(x => matRows.push([C(x.designacao||'',6), C(x.marca||'',6), C(x.ref||'',6)]));
+  const docsRows = [
+    [C('Documentação',1)],[],
+    [C('Obrigatória',3),C('Estado',3)],
+    ['Resultados dos ensaios com indicação da data e do técnico', o.docObrig?.ensaios ? 'Incluído' : 'Não incluído'],
+    ['Cópia dos certificados de calibração dos equipamentos utilizados nos ensaios', o.docObrig?.calibracao ? 'Incluído' : 'Não incluído'],
+    ['Cópia do projeto', o.docObrig?.projeto ? 'Incluído' : 'Não incluído'],
+    [],
+    [C('Documentação Facultativa',3)],
+    [o.docFacult || '—']
+  ];
+  return [
+    {name:'Ficha ' + tipo, rows:fichaRows, widths:[20,42,18,24,22,24]},
+    {name:'Cabos', rows:cabosRows, widths:[24,34,22,18], autoFilter:'A3:D' + cabosRows.length},
+    {name:'Materiais', rows:matRows, widths:[32,34,24], autoFilter:'A3:C' + matRows.length},
+    {name:'Documentos', rows:docsRows, widths:[70,18]}
+  ];
+}
+async function buildFichaItedIturXlsxBlob(o, tipo, cliente){
+  return createXlsxBlob(buildFichaItedIturWorkbookSheets(o, tipo, cliente));
+}
+function buildFolhaDiasWorkbookSheets(o, cliente){
+  _ensureWorkersStorage();
+  const C = (v,s) => ({v, s:s||0});
+  const pres = state.presencas.filter(p => p.obraId === o.id).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const byWorkerDay = {};
+  pres.forEach(p => { byWorkerDay[p.workerId + '|' + p.data] = p; });
+  const unique = Object.values(byWorkerDay);
+  const resumo = {};
+  unique.forEach(p => {
+    const w = state.workers.find(x=>x.id === p.workerId);
+    const key = p.workerId;
+    if(!resumo[key]) resumo[key] = {nome:w?w.nome:'(eliminado)', notas:w?w.notas:'', dias:0, primeiro:p.data, ultimo:p.data};
+    resumo[key].dias += 1;
+    if(p.data < resumo[key].primeiro) resumo[key].primeiro = p.data;
+    if(p.data > resumo[key].ultimo) resumo[key].ultimo = p.data;
+  });
+  const resumoRows = [
+    [C('FOLHA DE DIAS TRABALHADOS',1)],
+    [C('Obra',4), 'Obra ' + obraLabel(o), C('Cliente',4), cliente ? cliente.nome : '—'],
+    [C('Período',4), pres.length ? (fmtDate(pres[0].data) + ' a ' + fmtDate(pres[pres.length-1].data)) : 'Sem presenças', C('Exportado em',4), fmtDate(today())],
+    [],
+    [C('Resumo por Trabalhador',3)],
+    [C('Trabalhador',2),C('Total de Dias',2),C('Primeiro Dia',2),C('Último Dia',2),C('Notas',2)]
+  ];
+  const resumoList = Object.values(resumo).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-PT'));
+  if(resumoList.length){
+    resumoList.forEach(r => resumoRows.push([C(r.nome,6), C(r.dias,6), C(fmtDate(r.primeiro),6), C(fmtDate(r.ultimo),6), C(r.notas||'',6)]));
+  } else {
+    resumoRows.push([C('Sem presenças registadas nesta obra.',6)]);
+  }
+  const detalheMap = {};
+  pres.forEach(p => {
+    const k = p.data + '|' + p.workerId;
+    if(!detalheMap[k]) detalheMap[k] = {data:p.data, workerId:p.workerId};
+  });
+  const detalheRows = [
+    [C('DETALHE DIÁRIO',1)],
+    [C('Obra',4), 'Obra ' + obraLabel(o), C('Cliente',4), cliente ? cliente.nome : '—'],
+    [],
+    [C('Data',2),C('Dia da Semana',2),C('Trabalhador',2),C('Obra',2),C('Cliente',2)]
+  ];
+  const detalheList = Object.values(detalheMap).sort((a,b)=>(a.data||'').localeCompare(b.data||'') || String(a.workerId).localeCompare(String(b.workerId)));
+  if(detalheList.length){
+    detalheList.forEach(d => {
+      const w = state.workers.find(x=>x.id === d.workerId);
+      detalheRows.push([C(fmtDate(d.data),6), C(_xlsxDayName(d.data),6), C(w?w.nome:'(eliminado)',6), C('Obra ' + obraLabel(o),6), C(cliente?cliente.nome:'—',6)]);
+    });
+  } else {
+    detalheRows.push([C('Sem presenças registadas.',6)]);
+  }
+  const notaRows = [
+    [C('Notas',1)],[],
+    ['Cada dia conta uma única vez por trabalhador nesta obra.'],
+    ['Esta folha não inclui valores de salário. O cálculo pode ser feito em privado no Excel.']
+  ];
+  return [
+    {name:'Resumo', rows:resumoRows, widths:[32,16,18,18,38], autoFilter:resumoList.length ? 'A6:E' + resumoRows.length : ''},
+    {name:'Detalhe Diário', rows:detalheRows, widths:[16,20,32,18,32], autoFilter:detalheList.length ? 'A4:E' + detalheRows.length : ''},
+    {name:'Notas', rows:notaRows, widths:[90]}
+  ];
+}
+async function buildFolhaDiasObraXlsxBlob(o, cliente){
+  return createXlsxBlob(buildFolhaDiasWorkbookSheets(o, cliente));
+}
+
+function buildFolhaDiasGlobalWorkbookSheets(pres, periodLabel, workerLabel){
+  _ensureWorkersStorage();
+  const C = (v,s) => ({v, s:s||0});
+  const diasUnicos = {};
+  pres.forEach(p => { diasUnicos[p.workerId + '|' + p.data] = true; });
+  const totaisPorTrab = {};
+  Object.keys(diasUnicos).forEach(k => {
+    const wid = k.split('|')[0];
+    totaisPorTrab[wid] = (totaisPorTrab[wid]||0) + 1;
+  });
+  const resumoRows = [
+    [C('FOLHA DE DIAS TRABALHADOS',1)],
+    [C('Período',4), periodLabel || 'Todos os períodos', C('Trabalhador',4), workerLabel || 'Todos'],
+    [C('Exportado em',4), fmtDate(today())],
+    [],
+    [C('Resumo por Trabalhador',3)],
+    [C('Trabalhador',2),C('Total de Dias',2),C('Notas',2)]
+  ];
+  state.workers.forEach(w => {
+    const total = totaisPorTrab[w.id] || 0;
+    if(total > 0) resumoRows.push([C(w.nome,6), C(total,6), C(w.notas||'',6)]);
+  });
+  if(resumoRows.length === 6) resumoRows.push([C('Sem presenças para o filtro selecionado.',6)]);
+
+  const detalheMap = {};
+  pres.forEach(p => {
+    const k = p.workerId + '|' + p.data;
+    if(!detalheMap[k]) detalheMap[k] = {workerId:p.workerId, data:p.data, obras:[], clientes:[]};
+    const o = state.obras.find(x => x.id === p.obraId);
+    if(o){
+      const label = 'Obra ' + obraLabel(o);
+      if(!detalheMap[k].obras.includes(label)) detalheMap[k].obras.push(label);
+      const c = state.clients.find(x => x.id === o.clienteId);
+      if(c && !detalheMap[k].clientes.includes(c.nome)) detalheMap[k].clientes.push(c.nome);
+    }
+  });
+  const detalheLista = Object.values(detalheMap).sort((a,b) => (a.data||'').localeCompare(b.data||'') || (a.workerId||'').localeCompare(b.workerId||''));
+  const detalheRows = [
+    [C('DETALHE DIÁRIO',1)],
+    [C('Período',4), periodLabel || 'Todos os períodos', C('Trabalhador',4), workerLabel || 'Todos'],
+    [],
+    [C('Data',2),C('Dia da Semana',2),C('Trabalhador',2),C('Obras Visitadas',2),C('Clientes',2)]
+  ];
+  detalheLista.forEach(d => {
+    const w = state.workers.find(x => x.id === d.workerId);
+    detalheRows.push([C(fmtDate(d.data),6), C(_xlsxDayName(d.data),6), C(w?w.nome:'(eliminado)',6), C(d.obras.join(', ')||'—',6), C(d.clientes.join(', ')||'—',6)]);
+  });
+  if(detalheRows.length === 4) detalheRows.push([C('Sem presenças para o filtro selecionado.',6)]);
+
+  const notasRows = [
+    [C('Notas',1)],[],
+    ['Cada dia conta uma única vez por trabalhador, mesmo que tenha visitado várias obras.'],
+    ['Esta folha não inclui valores de salário. O cálculo pode ser feito em privado no Excel.']
+  ];
+  return [
+    {name:'Resumo', rows:resumoRows, widths:[32,16,40], autoFilter:resumoRows.length > 6 ? 'A6:C' + resumoRows.length : ''},
+    {name:'Detalhe Diário', rows:detalheRows, widths:[16,20,32,42,36], autoFilter:detalheRows.length > 4 ? 'A4:E' + detalheRows.length : ''},
+    {name:'Notas', rows:notasRows, widths:[90]}
+  ];
+}
+async function buildFolhaDiasGlobalXlsxBlob(pres, periodLabel, workerLabel){
+  return createXlsxBlob(buildFolhaDiasGlobalWorkbookSheets(pres, periodLabel, workerLabel));
 }
 
 async function exportObraZIP(id, isFinal){
@@ -3060,7 +3476,7 @@ async function exportObraZIP(id, isFinal){
     if(o.incluiFichaItur) tiposFicha.push('ITUR');
     if(o.incluiFichaIted) tiposFicha.push('ITED');
 
-    const deps = await ensureZipDependencies(tiposFicha.length > 0, progress);
+    await ensureZipDependencies(false, progress);
 
     const zip = createZipEngine();
     const cliente = state.clients.find(c=>c.id===o.clienteId);
@@ -3072,36 +3488,22 @@ async function exportObraZIP(id, isFinal){
     indice.push('Valor: ' + fmt(o.valor));
     indice.push('');
 
-    // Gerar PDFs para cada tipo de ficha ativo
+    // Gerar ficheiros Excel para cada tipo de ficha ativo
     for(let idx=0; idx<tiposFicha.length; idx++){
       const tipo = tiposFicha[idx];
       const prefix = String(idx+1).padStart(2,'0');
-      progress('A gerar Ficha ' + tipo + ' em PDF...');
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.left = '-10000px';
-      tempDiv.style.top = '0';
-      tempDiv.innerHTML = renderItedSheet(o, tipo);
-      document.body.appendChild(tempDiv);
-      try {
-        if(deps.pdfReady){
-          const canvas = await html2canvas(tempDiv.firstElementChild, {scale:2, backgroundColor:'#ffffff'});
-          const { jsPDF } = window.jspdf;
-          const pdf = new jsPDF('p','mm','a4');
-          const pageW = pdf.internal.pageSize.getWidth();
-          const imgW = pageW - 20;
-          const imgH = canvas.height * imgW / canvas.width;
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
-          const fname = prefix + '_Ficha_' + tipo + '.pdf';
-          zip.file(fname, pdf.output('blob'));
-          indice.push(fname);
-        } else {
-          const fname = prefix + '_Ficha_' + tipo + '.html';
-          zip.file(fname, '<!doctype html><html><head><meta charset="utf-8"><title>Ficha '+tipo+'</title></head><body>' + renderItedSheet(o, tipo) + '</body></html>');
-          indice.push(fname + ' (PDF indisponível neste navegador/preview)');
-        }
-      } finally { document.body.removeChild(tempDiv); }
+      progress('A gerar Ficha ' + tipo + ' em Excel...');
+      const fname = '01_Fichas/' + prefix + '_Ficha_' + tipo + '.xlsx';
+      const fichaBlob = await buildFichaItedIturXlsxBlob(o, tipo, cliente);
+      zip.file(fname, fichaBlob);
+      indice.push(fname);
     }
+
+    progress('A gerar Folha de Dias em Excel...');
+    const folhaDiasNome = '02_Folha_Dias/Folha_Dias_Obra_' + obraTag + '.xlsx';
+    const folhaDiasBlob = await buildFolhaDiasObraXlsxBlob(o, cliente);
+    zip.file(folhaDiasNome, folhaDiasBlob);
+    indice.push(folhaDiasNome);
 
     const cats = { cobre:'02_Testes/Cobre', coaxial:'02_Testes/Coaxial', fibra:'02_Testes/Fibra' };
     for(const [k, folder] of Object.entries(cats)){
@@ -4073,7 +4475,7 @@ function viewTrabalhadores(){
       • Adicione os trabalhadores aqui (apenas o nome — sem salários nem dados sensíveis).<br>
       • Em cada obra, na ficha, marque <strong>quem esteve presente</strong> nesse dia.<br>
       • A app conta cada dia <strong>uma única vez</strong>, mesmo que o trabalhador tenha visitado várias obras nesse dia.<br>
-      • No fim do mês, clique em <strong>"📊 Exportar Folha de Dias"</strong> para ter o ficheiro Excel/CSV com tudo.<br>
+      • No fim do mês, clique em <strong>"📊 Exportar Folha de Dias"</strong> para ter o ficheiro Excel com tudo.<br>
       • Os valores de salário <strong>não estão na app</strong> — calcule no Excel exportado, em privado.
     </div>
   </div>
@@ -4305,7 +4707,7 @@ async function removerPresenca(presencaId, obraId){
   if(typeof openObra === 'function') openObra(obraId);
 }
 
-// === Exportar Folha de Dias (CSV) ===
+// === Exportar Folha de Dias (Excel) ===
 function exportarFolhaDias(){
   _ensureWorkersStorage();
   if(state.presencas.length === 0){
@@ -4322,7 +4724,7 @@ function exportarFolhaDias(){
   openModal(`
     <div class="p-6">
       <h2 class="text-2xl font-bold mb-4">📊 Exportar Folha de Dias</h2>
-      <p class="text-sm mb-4" style="color:var(--ink-soft);">Escolha o período. Será gerado um ficheiro CSV (abre em Excel ou LibreOffice) com o resumo e o detalhe diário, sem valores de salário.</p>
+      <p class="text-sm mb-4" style="color:var(--ink-soft);">Escolha o período. Será gerado um ficheiro Excel (.xlsx) com o resumo e o detalhe diário, sem valores de salário.</p>
       <div class="grid-2 mb-5">
         <div>
           <label class="label">Mês</label>
@@ -4341,13 +4743,13 @@ function exportarFolhaDias(){
       </div>
       <div class="flex justify-end gap-2">
         <button class="btn btn-ghost" onclick="closeModal(true)">Cancelar</button>
-        <button class="btn btn-primary" onclick="_doExportarDias()">📥 Descarregar CSV</button>
+        <button class="btn btn-primary" onclick="_doExportarDias()">📥 Descarregar Excel</button>
       </div>
     </div>
   `);
 }
 
-function _doExportarDias(){
+async function _doExportarDias(){
   const mes = document.getElementById('exp-mes').value;
   const wid = document.getElementById('exp-worker').value;
 
@@ -4360,74 +4762,21 @@ function _doExportarDias(){
     return;
   }
 
-  // Construir resumo: contar dias únicos por trabalhador
-  const diasUnicos = {};
-  pres.forEach(p => {
-    const k = p.workerId + '|' + p.data;
-    diasUnicos[k] = true;
-  });
-  const totaisPorTrab = {};
-  Object.keys(diasUnicos).forEach(k => {
-    const wid = k.split('|')[0];
-    totaisPorTrab[wid] = (totaisPorTrab[wid]||0) + 1;
-  });
-
-  // Construir detalhe: agrupar por (data, trabalhador), juntar obras
-  const detalheMap = {};
-  pres.forEach(p => {
-    const k = p.workerId + '|' + p.data;
-    if(!detalheMap[k]) detalheMap[k] = {workerId: p.workerId, data: p.data, obras: []};
-    const o = state.obras.find(x => x.id === p.obraId);
-    if(o) detalheMap[k].obras.push(obraLabel(o));
-  });
-  const detalheLista = Object.values(detalheMap).sort((a,b) => (a.data||'').localeCompare(b.data||'') || (a.workerId).localeCompare(b.workerId));
-
-  // Construir CSV
-  const csv = [];
   const periodLabel = mes === 'todos' ? 'Todos os períodos' : (() => {
     const [y,mo] = mes.split('-');
     return ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][+mo-1] + ' ' + y;
   })();
-
-  csv.push('TRITED — Folha de Dias Trabalhados');
-  csv.push('Período;' + periodLabel);
-  csv.push('Exportado em;' + fmtDate(today()));
-  csv.push('');
-  csv.push('=== RESUMO POR TRABALHADOR ===');
-  csv.push('Trabalhador;Total de Dias;Notas');
-  state.workers.forEach(w => {
-    const total = totaisPorTrab[w.id] || 0;
-    if(total === 0 && wid !== 'todos' && wid !== w.id) return;
-    if(total === 0) return;
-    csv.push([w.nome, total, w.notas||''].map(_csvCell).join(';'));
-  });
-  csv.push('');
-  csv.push('=== DETALHE DIÁRIO ===');
-  csv.push('Data;Dia da Semana;Trabalhador;Obras Visitadas');
-  const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  detalheLista.forEach(d => {
-    const w = state.workers.find(x => x.id === d.workerId);
-    const dt = new Date(d.data + 'T00:00:00');
-    csv.push([
-      fmtDate(d.data),
-      diasSemana[dt.getDay()],
-      w ? w.nome : '(eliminado)',
-      d.obras.join(', ')
-    ].map(_csvCell).join(';'));
-  });
-  csv.push('');
-  csv.push('Nota: Cada dia conta uma única vez por trabalhador, mesmo que tenha visitado várias obras.');
-  csv.push('Para calcular salário: multiplique a coluna "Total de Dias" pela diária de cada trabalhador (em privado).');
-
-  // BOM para Excel reconhecer UTF-8 com acentos
-  const BOM = '\uFEFF';
-  const blob = new Blob([BOM + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  const periodTag = mes === 'todos' ? 'todos' : mes;
-  a.download = 'TRITED_Dias_' + periodTag + '.csv';
-  a.click();
-  closeModal(true);
+  const worker = wid && wid !== 'todos' ? state.workers.find(w => w.id === wid) : null;
+  const workerLabel = worker ? worker.nome : 'Todos';
+  try {
+    const blob = await buildFolhaDiasGlobalXlsxBlob(pres, periodLabel, workerLabel);
+    const periodTag = mes === 'todos' ? 'todos' : mes;
+    _downloadBlobWithAnchor(blob, 'TRITED_Dias_' + periodTag + '.xlsx');
+    closeModal(true);
+  } catch(e){
+    console.error('Erro ao exportar folha de dias:', e);
+    alert('Erro ao exportar folha de dias: ' + (e && e.message ? e.message : e));
+  }
 }
 
 function _csvCell(v){
