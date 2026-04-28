@@ -253,7 +253,7 @@
   <section class="app-content">
     <header class="content-topbar">
       <div class="content-topbar-title">
-        <h1 id="topbarTitle" class="serif">Painel</h1>
+        <h1 id="topbarTitle" class="serif">Dashboard</h1>
         <p>Pesquisa global e navegação rápida da empresa.</p>
       </div>
       <div class="content-topbar-actions">
@@ -276,7 +276,7 @@
 // ║  3. NAV .................. Tabs, routing                  ║
 // ║  4. DIRTY FLAG ........... Proteção contra sair s/ guardar║
 // ║  5. HELPERS .............. Formatação, cálculos, utils    ║
-// ║  6. PAINEL ............... Dashboard principal            ║
+// ║  6. DASHBOARD ............ Visão geral da empresa          ║
 // ║  7. CLIENTES ............. Lista + ficha + CRUD           ║
 // ║  8. OBRAS ................ Ficha + edição + estado        ║
 // ║  9. PAGAMENTOS ........... Histórico, registar, remover   ║
@@ -462,22 +462,40 @@ function renderAuthGate(){
   const box = document.createElement('div');
   box.id = 'loginScreen';
   box.className = 'min-h-screen';
-  box.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);background-image:var(--bg-grad);';
+  box.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:24px;background:#080f1e;background-image:radial-gradient(circle at top left, rgba(47,98,161,.26), transparent 32%), radial-gradient(circle at bottom right, rgba(12,32,58,.8), transparent 38%), linear-gradient(135deg, #08101d 0%, #0b1730 100%);';
   box.innerHTML = `
-    <div class="card" style="width:100%;max-width:430px;padding:28px;">
-      <div class="brand" style="justify-content:center;margin-bottom:14px;">
-        <img src="${getLogoSrc()}" alt="TRITED" class="brand-img" style="height:58px;">
-      </div>
-      <h1 class="text-2xl font-bold text-center mb-1">Entrar na Gestão</h1>
-      <p class="text-sm text-center mb-6" style="color:var(--muted);">Acesso para escritório e trabalhadores</p>
-      <div class="mb-3"><label class="label">Utilizador</label><input class="input" id="login-user" autocomplete="username" placeholder="admin"></div>
-      <div class="mb-3"><label class="label">Palavra-passe</label><input class="input" id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()"></div>
-      <div id="login-error" class="text-sm mb-3" style="display:none;color:var(--danger);"></div>
-      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;padding:12px 16px;">Entrar</button>
-      <div class="text-xs mt-5 p-3 rounded" style="background:var(--line-soft);color:var(--ink-soft);line-height:1.5;">
-        Primeiro acesso: <strong>admin</strong> / <strong>admin123</strong><br>
-        Trabalhador: <strong>trabalhador</strong> / <strong>1234</strong><br>
-        Depois cria/edita utilizadores no separador <strong>Utilizadores</strong>.
+    <div style="width:100%;max-width:1020px;overflow:hidden;border-radius:30px;border:1px solid rgba(255,255,255,.08);box-shadow:0 30px 80px rgba(0,0,0,.35);background:rgba(255,255,255,.04);backdrop-filter:blur(8px);">
+      <div class="grid md:grid-cols-2">
+        <div style="display:flex;flex-direction:column;justify-content:center;padding:56px 44px;background:linear-gradient(135deg, rgba(13,24,40,.96) 0%, rgba(8,15,30,.92) 100%);color:#fff;min-height:560px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px;">
+            <img src="${getLogoSrc()}" alt="TRITED" style="height:60px;width:auto;display:block;">
+          </div>
+          <p style="margin:18px 0 0 0;font-size:22px;line-height:1.35;color:rgba(255,255,255,.82);max-width:340px;">A sua obra, sob controlo.</p>
+          <div style="margin-top:42px;padding-top:22px;border-top:1px solid rgba(255,255,255,.12);max-width:360px;color:rgba(255,255,255,.6);font-size:14px;line-height:1.6;">
+            Gestão clara, acompanhamento diário e controlo centralizado para escritório e equipa em obra.
+          </div>
+        </div>
+        <div style="background:#ffffff;padding:56px 42px;display:flex;align-items:center;justify-content:center;min-height:560px;">
+          <div style="width:100%;max-width:360px;">
+            <div style="font-size:34px;font-weight:800;line-height:1.05;color:#0f172a;margin-bottom:8px;letter-spacing:-0.02em;">Sign In</div>
+            <p style="margin:0 0 28px 0;color:#64748b;font-size:14px;line-height:1.5;">Entre com as suas credenciais para aceder à plataforma.</p>
+            <div style="margin-bottom:16px;">
+              <label for="login-user" style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#475569;">Username</label>
+              <input id="login-user" autocomplete="username" placeholder="admin" style="width:100%;padding:13px 14px;border:1.5px solid #d7dfeb;border-radius:12px;background:#fff;font-size:14px;color:#0f172a;outline:none;transition:border-color .15s, box-shadow .15s;" onfocus="this.style.borderColor='#2a6ba3';this.style.boxShadow='0 0 0 4px rgba(42,107,163,.12)'" onblur="this.style.borderColor='#d7dfeb';this.style.boxShadow='none'">
+            </div>
+            <div style="margin-bottom:16px;">
+              <label for="login-pass" style="display:block;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#475569;">Password</label>
+              <input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()" style="width:100%;padding:13px 14px;border:1.5px solid #d7dfeb;border-radius:12px;background:#fff;font-size:14px;color:#0f172a;outline:none;transition:border-color .15s, box-shadow .15s;" onfocus="this.style.borderColor='#2a6ba3';this.style.boxShadow='0 0 0 4px rgba(42,107,163,.12)'" onblur="this.style.borderColor='#d7dfeb';this.style.boxShadow='none'">
+            </div>
+            <div id="login-error" class="text-sm mb-4" style="display:none;color:#dc2626;"></div>
+            <button onclick="doLogin()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;padding:14px 16px;border:none;border-radius:12px;background:linear-gradient(135deg,#2a6ba3 0%,#143f64 100%);color:#fff;font-size:15px;font-weight:700;box-shadow:0 12px 24px rgba(20,63,100,.18);cursor:pointer;">Entrar</button>
+            <div style="margin-top:24px;padding:14px 16px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;color:#475569;font-size:12.5px;line-height:1.6;">
+              <strong style="color:#0f172a;">Acesso inicial</strong><br>
+              admin / admin123<br>
+              trabalhador / 1234
+            </div>
+          </div>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(box);
@@ -826,7 +844,7 @@ async function toggleTheme(){
 
 // ============ 3. NAV ============
 const TABS = [
-  {id:'painel', label:'Painel'},
+  {id:'painel', label:'Dashboard'},
   {id:'clientes', label:'Clientes'},
   {id:'obras', label:'Obras'},
   {id:'catalogo', label:'Catálogo'},
@@ -847,7 +865,7 @@ function renderTabs(){
   const title = document.getElementById('topbarTitle');
   if(title){
     const activeTab = visibleTabs.find(t => t.id === currentTab);
-    title.textContent = activeTab ? String(activeTab.label).replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim() : 'Painel';
+    title.textContent = activeTab ? String(activeTab.label).replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim() : 'Dashboard';
   }
   updateSessionHeader();
 }
@@ -941,7 +959,7 @@ function clientStatus(clienteId){
   return { obras, divida, pago, pendCount, parcCount, pagasCount, emDia, total: obras.length };
 }
 
-// ============ 6. PAINEL ============
+// ============ 6. DASHBOARD ============
 
 function viewPainelTrabalhador(){
   const ESTADOS_ABERTOS = ['em_curso','pausada','aguarda_material','espera_cliente','falta_termo','pronto_faturar'];
@@ -1167,47 +1185,76 @@ function viewPainel(){
     </div>`;
   }).join('');
 
+  const alertasCriticos = d.obrasAtrasadas.length + d.orcExpirados.length + d.stockBaixo.length + d.alertLicencas.length;
+  const alertaRows = [
+    ...d.obrasAtrasadas.slice(0,3).map(o => {
+      const cl = state.clients.find(c=>c.id===o.clienteId);
+      return `<div class="py-3 border-b flex items-center justify-between gap-3 cursor-pointer" style="border-color:var(--line);" onclick="openObra('${o.id}')">
+        <div><div class="font-semibold"><span class="obra-num">${obraLabel(o)}</span> · ${escapeHtml((o.descricao||'').slice(0,55))}</div><div class="text-xs" style="color:var(--muted);">${escapeHtml(cl?cl.nome:'—')} · obra atrasada</div></div>
+        <span class="badge badge-warn">Obra</span>
+      </div>`;
+    }),
+    ...d.orcExpirados.slice(0,2).map(o => `<div class="py-3 border-b flex items-center justify-between gap-3 cursor-pointer" style="border-color:var(--line);" onclick="viewOrcamento('${o.id}')">
+      <div><div class="font-semibold">${orcLabel(o)} · ${escapeHtml((o.descricao||'').slice(0,55))}</div><div class="text-xs" style="color:var(--muted);">validade ${fmtDate(orcValidadeData(o))}</div></div>
+      <span class="badge badge-warn">Orçamento</span>
+    </div>`),
+    ...d.stockBaixo.slice(0,2).map(it => `<div class="py-3 border-b flex items-center justify-between gap-3 cursor-pointer" style="border-color:var(--line);" onclick="editItem('${it.id}')">
+      <div><div class="font-semibold">${escapeHtml(it.nome)}</div><div class="text-xs" style="color:var(--muted);">stock disponível abaixo do mínimo</div></div>
+      <span class="badge badge-danger">Stock</span>
+    </div>`),
+    ...d.alertLicencas.slice(0,2).map(a => `<div class="py-3 border-b flex items-center justify-between gap-3 cursor-pointer" style="border-color:var(--line);" onclick="editEquip('${a.eq.id}')">
+      <div><div class="font-semibold">${escapeHtml(a.eq.nome)}</div><div class="text-xs" style="color:var(--muted);">${escapeHtml(a.lic.nome)} · ${fmtDate(a.lic.dataFim)}</div></div>
+      <span class="badge badge-warn">Licença</span>
+    </div>`)
+  ].slice(0,6).join('');
+
   return `
-  <div class="grid-4 mb-6">
-    ${_painelCard('Obras Abertas', d.obrasAbertas.length, `${state.obras.length} obra(s) no total`, 'stat-blue', "setObrasFilter('abertas');switchTab('obras');")}
-    ${_painelCard('Obras Atrasadas', d.obrasAtrasadas.length, 'abertas há mais de 30 dias ou fora do prazo', 'stat-accent', "setObrasFilter('abertas');switchTab('obras');")}
-    ${_painelCard('Orçamentos Pendentes', d.orcPendentes.length, fmt(totalOrcPend) + ' em aberto', 'stat-blue', "setOrcamentosFilter('todos');switchTab('orcamentos');")}
-    ${_painelCard('Prontas p/ Faturar', d.obrasProntas.length, fmt(totalPronto), 'stat-accent', "setObrasFilter('pronto_faturar');switchTab('obras');")}
+  <div class="card p-5 mb-6" style="background:linear-gradient(135deg,var(--card) 0%,var(--bg-alt) 100%);">
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <div class="label">Dashboard</div>
+        <h2 class="text-2xl font-bold mb-1">Visão rápida da empresa</h2>
+        <p class="text-sm" style="color:var(--muted);">Mostra só o essencial. Os detalhes ficam dentro de cada área.</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="btn btn-accent" onclick="editObra()">+ Nova Obra</button>
+        <button class="btn btn-primary" onclick="editOrcamento()">+ Novo Orçamento</button>
+      </div>
+    </div>
   </div>
 
   <div class="grid-4 mb-6">
-    ${_painelCard('Orçamentos Expirados', d.orcExpirados.length, 'precisam de revisão ou novo envio', 'stat-accent', "setOrcamentosFilter('expirado');switchTab('orcamentos');")}
-    ${_painelCard('Stock Baixo', d.stockBaixo.length, 'stock disponível abaixo do mínimo', 'stat-accent', "switchTab('inventario');")}
-    ${_painelCard('Pagamentos em Atraso', d.clientesAtraso.length, fmt(d.totalDivida) + ' por receber', 'stat-accent', '')}
-    ${_painelCard('Licenças a Expirar', d.alertLicencas.length, 'nos próximos 30 dias ou expiradas', 'stat-accent', "switchTab('equipamentos');")}
+    ${_painelCard('Obras Abertas', d.obrasAbertas.length, `${state.obras.length} obra(s) no total`, 'stat-blue', "setObrasFilter('abertas');switchTab('obras');")}
+    ${_painelCard('Prontas p/ Faturar', d.obrasProntas.length, fmt(totalPronto), 'stat-accent', "setObrasFilter('pronto_faturar');switchTab('obras');")}
+    ${_painelCard('Por Receber', fmt(d.totalDivida), `${d.clientesAtraso.length} cliente(s) com valores pendentes`, 'stat-accent', '')}
+    ${_painelCard('Alertas', alertasCriticos, 'obras, stock, orçamentos e licenças', 'stat-accent', '')}
   </div>
 
   <div class="grid-2 mb-6">
     ${_painelMiniList('💶 Obras prontas para faturar', d.obrasProntas.length, 'Nenhuma obra pronta para faturar.', obrasProntasHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setObrasFilter(\'pronto_faturar\');switchTab(\'obras\');">Ver todas →</button></div>')}
-    ${_painelMiniList('⏰ Obras atrasadas', d.obrasAtrasadas.length, 'Nenhuma obra atrasada.', obrasAtrasadasHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setObrasFilter(\'abertas\');switchTab(\'obras\');">Ver obras abertas →</button></div>')}
+    ${_painelMiniList('⚠️ Prioridades de hoje', alertasCriticos, 'Sem alertas importantes.', alertaRows, '<div class="mt-3 flex gap-2 flex-wrap"><button class="btn btn-ghost" onclick="setObrasFilter(\'abertas\');switchTab(\'obras\');">Obras →</button><button class="btn btn-ghost" onclick="switchTab(\'inventario\');">Stock →</button><button class="btn btn-ghost" onclick="switchTab(\'equipamentos\');">Licenças →</button></div>')}
   </div>
 
-  <div class="grid-2 mb-6">
-    ${_painelMiniList('📋 Orçamentos pendentes', d.orcPendentes.length, 'Sem orçamentos pendentes.', orcPendentesHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setOrcamentosFilter(\'todos\');switchTab(\'orcamentos\');">Ver orçamentos →</button></div>')}
-    ${_painelMiniList('⏳ Orçamentos expirados', d.orcExpirados.length, 'Sem orçamentos expirados.', orcExpiradosHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setOrcamentosFilter(\'expirado\');switchTab(\'orcamentos\');">Ver expirados →</button></div>')}
-  </div>
-
-  <div class="grid-2 mb-6">
-    ${_painelMiniList('📦 Stock baixo', d.stockBaixo.length, 'Sem alertas de stock baixo.', stockHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="switchTab(\'inventario\');">Ver inventário →</button></div>')}
-    ${_painelMiniList('💰 Pagamentos em atraso', d.clientesAtraso.length, 'Todos os clientes estão em dia.', pagamentosHtml, '')}
-  </div>
-
-  <div class="grid-2 mb-6">
-    ${_painelMiniList('🔧 Licenças / calibrações a expirar', d.alertLicencas.length, 'Nenhuma licença a expirar nos próximos 30 dias.', licencasHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="switchTab(\'equipamentos\');">Ver equipamentos →</button></div>')}
-    <div class="card p-5">
-      <h2 class="text-xl font-bold mb-4">📌 Resumo financeiro</h2>
-      <div class="grid-2">
-        <div class="section-box"><div class="label">Por receber</div><div class="stat-num stat-accent" style="font-size:26px;">${fmt(d.totalDivida)}</div></div>
-        <div class="section-box"><div class="label">Já recebido</div><div class="stat-num stat-ok" style="font-size:26px;">${fmt(d.totalRecebido)}</div></div>
+  <details class="card p-5 mb-6">
+    <summary class="font-semibold" style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span>Mais indicadores</span>
+      <span class="badge badge-blue">abrir</span>
+    </summary>
+    <div class="grid-2 mt-5">
+      ${_painelMiniList('📋 Orçamentos pendentes', d.orcPendentes.length, 'Sem orçamentos pendentes.', orcPendentesHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setOrcamentosFilter(\'todos\');switchTab(\'orcamentos\');">Ver orçamentos →</button></div>')}
+      ${_painelMiniList('⏳ Orçamentos expirados', d.orcExpirados.length, 'Sem orçamentos expirados.', orcExpiradosHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="setOrcamentosFilter(\'expirado\');switchTab(\'orcamentos\');">Ver expirados →</button></div>')}
+      ${_painelMiniList('📦 Stock baixo', d.stockBaixo.length, 'Sem alertas de stock baixo.', stockHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="switchTab(\'inventario\');">Ver inventário →</button></div>')}
+      ${_painelMiniList('💰 Pagamentos em atraso', d.clientesAtraso.length, 'Todos os clientes estão em dia.', pagamentosHtml, '')}
+      ${_painelMiniList('🔧 Licenças / calibrações a expirar', d.alertLicencas.length, 'Nenhuma licença a expirar nos próximos 30 dias.', licencasHtml, '<div class="mt-3"><button class="btn btn-ghost" onclick="switchTab(\'equipamentos\');">Ver equipamentos →</button></div>')}
+      <div class="card p-5">
+        <h2 class="text-xl font-bold mb-4">📌 Resumo financeiro</h2>
+        <div class="grid-2">
+          <div class="section-box"><div class="label">Por receber</div><div class="stat-num stat-accent" style="font-size:26px;">${fmt(d.totalDivida)}</div></div>
+          <div class="section-box"><div class="label">Já recebido</div><div class="stat-num stat-ok" style="font-size:26px;">${fmt(d.totalRecebido)}</div></div>
+        </div>
       </div>
-      <div class="text-xs mt-3" style="color:var(--muted);">A faturação mensal continua no gráfico abaixo.</div>
     </div>
-  </div>
+  </details>
 
   ${renderMonthlyChart()}
   `;
@@ -2833,10 +2880,172 @@ function renderItedSheet(o, tipo){
   </div>`;
 }
 
+
+function loadScriptOnce(src, testFn){
+  return new Promise((resolve, reject) => {
+    try {
+      if(typeof testFn === 'function' && testFn()) return resolve(true);
+      const existing = Array.from(document.scripts).find(s => s.src === src);
+      if(existing){
+        if(typeof testFn === 'function' && testFn()) return resolve(true);
+        existing.addEventListener('load', () => resolve(true), {once:true});
+        existing.addEventListener('error', () => reject(new Error('Não foi possível carregar a biblioteca externa.')), {once:true});
+        setTimeout(() => resolve(!testFn || testFn()), 3500);
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error('Não foi possível carregar: ' + src));
+      document.head.appendChild(s);
+    } catch(e){ reject(e); }
+  });
+}
+
+const _miniZipEncoder = new TextEncoder();
+const _miniZipCrcTable = (() => {
+  const table = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function _miniZipCrc32(bytes){
+  let c = 0xffffffff;
+  for(let i=0;i<bytes.length;i++) c = _miniZipCrcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function _miniZipDosTimeDate(date){
+  const d = date || new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds()/2);
+  const dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth()+1) << 5) | d.getDate();
+  return {time, date:dosDate};
+}
+function _miniZipHeader(size){
+  const buf = new ArrayBuffer(size);
+  return {buf, view:new DataView(buf)};
+}
+function _miniZipWrite(view, offset, values){
+  values.forEach(v => {
+    if(v.size === 2){ view.setUint16(offset, v.value, true); offset += 2; }
+    else { view.setUint32(offset, v.value, true); offset += 4; }
+  });
+}
+async function _miniZipBytes(content){
+  if(content instanceof Uint8Array) return content;
+  if(content instanceof ArrayBuffer) return new Uint8Array(content);
+  if(content instanceof Blob) return new Uint8Array(await content.arrayBuffer());
+  if(typeof content === 'string') return _miniZipEncoder.encode(content);
+  return _miniZipEncoder.encode(String(content ?? ''));
+}
+class SimpleZip{
+  constructor(){ this.files = []; }
+  file(name, content){ this.files.push({name:String(name||'ficheiro.txt'), content}); }
+  async generateAsync(opts, onUpdate){
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const total = Math.max(1, this.files.length);
+    for(let i=0;i<this.files.length;i++){
+      const f = this.files[i];
+      const nameBytes = _miniZipEncoder.encode(f.name.replace(/^\/+/,''));
+      const bytes = await _miniZipBytes(f.content);
+      const crc = _miniZipCrc32(bytes);
+      const dt = _miniZipDosTimeDate(new Date());
+      const local = _miniZipHeader(30);
+      _miniZipWrite(local.view, 0, [
+        {size:4,value:0x04034b50},{size:2,value:20},{size:2,value:0},{size:2,value:0},
+        {size:2,value:dt.time},{size:2,value:dt.date},{size:4,value:crc},{size:4,value:bytes.length},
+        {size:4,value:bytes.length},{size:2,value:nameBytes.length},{size:2,value:0}
+      ]);
+      chunks.push(local.buf, nameBytes, bytes);
+      const centralHeader = _miniZipHeader(46);
+      _miniZipWrite(centralHeader.view, 0, [
+        {size:4,value:0x02014b50},{size:2,value:20},{size:2,value:20},{size:2,value:0},{size:2,value:0},
+        {size:2,value:dt.time},{size:2,value:dt.date},{size:4,value:crc},{size:4,value:bytes.length},
+        {size:4,value:bytes.length},{size:2,value:nameBytes.length},{size:2,value:0},{size:2,value:0},
+        {size:2,value:0},{size:2,value:0},{size:4,value:0},{size:4,value:offset}
+      ]);
+      central.push(centralHeader.buf, nameBytes);
+      offset += local.buf.byteLength + nameBytes.length + bytes.length;
+      if(typeof onUpdate === 'function') onUpdate({percent: Math.round(((i+1)/total)*100)});
+    }
+    const centralOffset = offset;
+    let centralSize = 0;
+    central.forEach(c => { centralSize += c.byteLength || c.length || 0; chunks.push(c); });
+    const end = _miniZipHeader(22);
+    _miniZipWrite(end.view, 0, [
+      {size:4,value:0x06054b50},{size:2,value:0},{size:2,value:0},{size:2,value:this.files.length},
+      {size:2,value:this.files.length},{size:4,value:centralSize},{size:4,value:centralOffset},{size:2,value:0}
+    ]);
+    chunks.push(end.buf);
+    return new Blob(chunks, {type:'application/zip'});
+  }
+}
+function createZipEngine(){
+  return (typeof JSZip !== 'undefined') ? new JSZip() : new SimpleZip();
+}
+
+
+async function ensureZipDependencies(needPdf, progress){
+  if(typeof JSZip === 'undefined'){
+    try {
+      if(progress) progress('A carregar biblioteca ZIP...');
+      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', () => typeof JSZip !== 'undefined');
+    } catch(e){
+      console.warn('JSZip externo não carregou; a usar ZIP interno.', e);
+    }
+  }
+  if(typeof JSZip === 'undefined' && progress) progress('A usar motor ZIP interno...');
+
+  let pdfReady = false;
+  if(needPdf){
+    try {
+      if(typeof html2canvas === 'undefined'){
+        if(progress) progress('A carregar gerador de imagem para PDF...');
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', () => typeof html2canvas !== 'undefined');
+      }
+      if(!window.jspdf || !window.jspdf.jsPDF){
+        if(progress) progress('A carregar gerador de PDF...');
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => !!(window.jspdf && window.jspdf.jsPDF));
+      }
+      pdfReady = (typeof html2canvas !== 'undefined' && !!(window.jspdf && window.jspdf.jsPDF));
+    } catch(e){
+      console.warn('Bibliotecas PDF não carregaram; fichas serão guardadas como HTML.', e);
+      pdfReady = false;
+    }
+  }
+  return { pdfReady };
+}
+
+function showZipReadyOverlay(overlay, blob, filename){
+  const url = URL.createObjectURL(blob);
+  overlay.className = 'modal-bg';
+  overlay.style.zIndex = '90';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:430px;">
+      <div class="p-6 text-center">
+        <div style="font-size:40px;margin-bottom:8px;">✅</div>
+        <h3 class="text-xl font-bold mb-2">ZIP pronto</h3>
+        <p class="text-sm mb-4" style="color:var(--muted);line-height:1.5;">Se o download não começou automaticamente, carregue no botão abaixo.</p>
+        <a id="zip-download-link" href="${url}" download="${escapeAttr(filename)}" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 16px;">⬇ Descarregar ZIP</a>
+        <button class="btn btn-ghost mt-3" onclick="this.closest('.modal-bg').remove()" style="width:100%;justify-content:center;">Fechar</button>
+      </div>
+    </div>`;
+  const link = overlay.querySelector('#zip-download-link');
+  if(link){
+    // Auto-download quando o navegador permite; botão fica como alternativa manual.
+    setTimeout(() => { try { link.click(); } catch(e){} }, 120);
+  }
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 5 * 60 * 1000);
+}
+
 async function exportObraZIP(id, isFinal){
   const o = state.obras.find(x=>x.id===id);
   if(!o){ alert('Obra não encontrada'); return; }
-  if(typeof JSZip === 'undefined'){ alert('JSZip ainda não carregou. Tente novamente.'); return; }
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-bg';
@@ -2844,9 +3053,16 @@ async function exportObraZIP(id, isFinal){
   overlay.innerHTML = '<div class="modal" style="max-width:380px;"><div class="p-6 text-center"><div style="font-size:36px;margin-bottom:8px;">📦</div><h3 class="text-xl font-bold mb-2">A gerar ZIP...</h3><p class="text-sm" style="color:var(--muted);" id="zip-progress">A preparar</p></div></div>';
   document.body.appendChild(overlay);
   const progress = (msg) => { const p = document.getElementById('zip-progress'); if(p) p.textContent = msg; };
+  let keepOverlay = false;
 
   try {
-    const zip = new JSZip();
+    const tiposFicha = [];
+    if(o.incluiFichaItur) tiposFicha.push('ITUR');
+    if(o.incluiFichaIted) tiposFicha.push('ITED');
+
+    const deps = await ensureZipDependencies(tiposFicha.length > 0, progress);
+
+    const zip = createZipEngine();
     const cliente = state.clients.find(c=>c.id===o.clienteId);
     const obraTag = obraLabel(o);
     let indice = ['INDICE - Obra ' + obraTag, '='.repeat(40), ''];
@@ -2857,9 +3073,6 @@ async function exportObraZIP(id, isFinal){
     indice.push('');
 
     // Gerar PDFs para cada tipo de ficha ativo
-    const tiposFicha = [];
-    if(o.incluiFichaItur) tiposFicha.push('ITUR');
-    if(o.incluiFichaIted) tiposFicha.push('ITED');
     for(let idx=0; idx<tiposFicha.length; idx++){
       const tipo = tiposFicha[idx];
       const prefix = String(idx+1).padStart(2,'0');
@@ -2867,19 +3080,26 @@ async function exportObraZIP(id, isFinal){
       const tempDiv = document.createElement('div');
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '-10000px';
+      tempDiv.style.top = '0';
       tempDiv.innerHTML = renderItedSheet(o, tipo);
       document.body.appendChild(tempDiv);
       try {
-        const canvas = await html2canvas(tempDiv.firstElementChild, {scale:2, backgroundColor:'#ffffff'});
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p','mm','a4');
-        const pageW = pdf.internal.pageSize.getWidth();
-        const imgW = pageW - 20;
-        const imgH = canvas.height * imgW / canvas.width;
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
-        const fname = prefix + '_Ficha_' + tipo + '.pdf';
-        zip.file(fname, pdf.output('blob'));
-        indice.push(fname);
+        if(deps.pdfReady){
+          const canvas = await html2canvas(tempDiv.firstElementChild, {scale:2, backgroundColor:'#ffffff'});
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF('p','mm','a4');
+          const pageW = pdf.internal.pageSize.getWidth();
+          const imgW = pageW - 20;
+          const imgH = canvas.height * imgW / canvas.width;
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, imgW, imgH);
+          const fname = prefix + '_Ficha_' + tipo + '.pdf';
+          zip.file(fname, pdf.output('blob'));
+          indice.push(fname);
+        } else {
+          const fname = prefix + '_Ficha_' + tipo + '.html';
+          zip.file(fname, '<!doctype html><html><head><meta charset="utf-8"><title>Ficha '+tipo+'</title></head><body>' + renderItedSheet(o, tipo) + '</body></html>');
+          indice.push(fname + ' (PDF indisponível neste navegador/preview)');
+        }
       } finally { document.body.removeChild(tempDiv); }
     }
 
@@ -2894,9 +3114,9 @@ async function exportObraZIP(id, isFinal){
 
     const equipsUsados = (o.equipamentosUsados||[]).map(eqId => state.equipment.find(e=>e.id===eqId)).filter(Boolean);
     for(const eq of equipsUsados){
-      const safeName = eq.nome.replace(/[\/\\:*?"<>|]/g,'_');
+      const safeName = String(eq.nome || 'Equipamento').replace(/[\/\\:*?"<>|]/g,'_');
       const folder = '03_Equipamentos_Utilizados/' + safeName;
-      let info = ['Equipamento: ' + eq.nome];
+      let info = ['Equipamento: ' + (eq.nome || '')];
       if(eq.tipo) info.push('Tipo: ' + eq.tipo);
       if(eq.numeroSerie) info.push('Nº Série: ' + eq.numeroSerie);
       if(eq.dataCompra) info.push('Data de compra: ' + fmtDate(eq.dataCompra));
@@ -2927,16 +3147,14 @@ async function exportObraZIP(id, isFinal){
     zip.file('INDICE.txt', indice.join('\n'));
     progress('A comprimir...');
     const blob = await zip.generateAsync({type:'blob'}, m => progress('A comprimir... ' + Math.round(m.percent) + '%'));
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'TRITED_Obra_' + obraTag + (isFinal ? '_FINAL' : '') + '.zip';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const filename = 'TRITED_Obra_' + obraTag + (isFinal ? '_FINAL' : '') + '.zip';
+    showZipReadyOverlay(overlay, blob, filename);
+    keepOverlay = true;
   } catch(e){
-    alert('Erro ao gerar ZIP: ' + e.message);
+    console.error('Erro ao gerar ZIP:', e);
+    alert('Erro ao gerar ZIP: ' + (e && e.message ? e.message : e));
   } finally {
-    overlay.remove();
+    if(!keepOverlay && overlay && overlay.parentNode) overlay.remove();
   }
 }
 
@@ -5210,7 +5428,7 @@ function viewUtilizadores(){
     <div class="font-semibold mb-1">Perfis nesta versão</div>
     <div class="text-sm" style="color:var(--ink-soft);line-height:1.6;">
       <strong>Administrador / Escritório</strong>: acesso total à app, incluindo utilizadores.<br>
-      <strong>Trabalhador</strong>: acesso limitado a Painel, Obras e Trabalhadores/Presenças.
+      <strong>Trabalhador</strong>: acesso limitado a Dashboard, Obras e Trabalhadores/Presenças.
     </div>
   </div>`;
 }
